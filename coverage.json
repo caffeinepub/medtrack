@@ -1,0 +1,80 @@
+{
+  "kind": "coverage_report",
+  "version": "1.0",
+  "generatedAt": "2026-02-24T17:30:21.466Z",
+  "sources": {
+    "buildRequest": true,
+    "implementationPlan": true
+  },
+  "requirements": {
+    "total": 4,
+    "implemented": 1,
+    "items": [
+      {
+        "id": "REQ-10",
+        "summary": "Add a backend endpoint that accepts an uploaded file (PDF or image encoded as binary/base64), stores the raw file data per principal, and returns a stable reference ID for the uploaded asset.",
+        "status": "unknown",
+        "plannedFiles": [],
+        "matchedFiles": []
+      },
+      {
+        "id": "REQ-11",
+        "summary": "Add a backend OCR processing endpoint that takes a stored file reference ID, performs text extraction on the file content, and returns structured fields: detected date, test names, and test result values parsed from the extracted text.",
+        "status": "unknown",
+        "plannedFiles": [],
+        "matchedFiles": []
+      },
+      {
+        "id": "REQ-12",
+        "summary": "Add an 'Upload Record' option to the Add Record page UI. The upload flow must allow the user to select or drag-and-drop a PDF or image file, display a preview or filename confirmation, trigger OCR extraction on the uploaded file, and pre-populate the medical record form fields (date, category, and metric values) with the extracted data for user review and correction before submission.",
+        "status": "implemented",
+        "plannedFiles": [
+          "frontend/src/components/FileUploadZone.tsx",
+          "frontend/src/components/UploadRecordForm.tsx",
+          "frontend/src/pages/AddRecordPage.tsx",
+          "frontend/src/hooks/useQueries.ts",
+          "frontend/src/types/fileUpload.ts"
+        ],
+        "matchedFiles": [
+          "frontend/src/components/FileUploadZone.tsx",
+          "frontend/src/components/UploadRecordForm.tsx",
+          "frontend/src/pages/AddRecordPage.tsx",
+          "frontend/src/hooks/useQueries.ts",
+          "frontend/src/types/fileUpload.ts"
+        ]
+      },
+      {
+        "id": "REQ-13",
+        "summary": "Add a `listUploadedFiles` backend endpoint that returns metadata (file ID, upload timestamp, MIME type) for all files uploaded by the calling principal, and a `deleteUploadedFile` endpoint to remove a file by ID.",
+        "status": "unknown",
+        "plannedFiles": [],
+        "matchedFiles": []
+      }
+    ]
+  },
+  "changedFiles": [
+    "backend/blob-storage/Mixin.mo",
+    "backend/blob-storage/Storage.mo",
+    "backend/main.mo",
+    "backend/migration.mo",
+    "build-request.json",
+    "caffeine.lock.json",
+    "feature_evidence.json",
+    "frontend-file-summaries.txt",
+    "frontend-implementation-plan.json",
+    "frontend/src/backend.d.ts",
+    "frontend/src/backend.ts",
+    "frontend/src/components/FileUploadZone.tsx",
+    "frontend/src/components/UploadRecordForm.tsx",
+    "frontend/src/declarations/backend.did.d.ts",
+    "frontend/src/declarations/backend.did.js",
+    "frontend/src/hooks/useQueries.ts",
+    "frontend/src/lib/ocrExtraction.ts",
+    "frontend/src/pages/AddRecordPage.tsx",
+    "frontend/src/types/fileUpload.ts",
+    "project_state.json",
+    "scratch/component-selection.json",
+    "spec.md",
+    "spec_vs_diff_report.json"
+  ]
+}

@@ -1,0 +1,58 @@
+{
+  "kind": "spec_vs_diff_report",
+  "version": "1.0",
+  "generatedAt": "2026-02-24T17:30:21.462Z",
+  "summary": "The diff implements most of the required upload and OCR extraction features. Frontend components (FileUploadZone, UploadRecordForm, AddRecordPage tabs, types, ocrExtraction lib) are present and well-structured. Backend shows uploadFile-related storage scaffolding. However, critical backend endpoints are not fully visible in the truncated diff, and the OCR extraction appears to be performed entirely client-side rather than in the Motoko actor as required by the constraints.",
+  "missing_requirements": [
+    {
+      "id": "REQ-11",
+      "requirement": "Backend OCR processing endpoint (extractRecordFromFile) that performs text extraction on stored file bytes and returns structured fields (detected date, test name/value pairs, raw text).",
+      "reason": "The OCR extraction logic is implemented entirely in frontend/src/lib/ocrExtraction.ts (client-side). No backend extractRecordFromFile endpoint is visible in the diff. The constraint explicitly states all OCR logic must remain within the single Motoko actor.",
+      "evidence": [
+        "frontend/src/lib/ocrExtraction.ts",
+        "backend/main.mo"
+      ]
+    },
+    {
+      "id": "REQ-13",
+      "requirement": "listUploadedFiles backend endpoint returning metadata (file ID, upload timestamp, MIME type) for all files uploaded by the calling principal.",
+      "reason": "No listUploadedFiles endpoint is visible in the truncated backend/main.mo and no corresponding frontend query hook is mentioned in the file summaries.",
+      "evidence": [
+        "backend/main.mo",
+        "frontend/src/hooks/useQueries.ts"
+      ]
+    },
+    {
+      "id": "REQ-13",
+      "requirement": "deleteUploadedFile backend endpoint to remove a file by ID, scoped to the owning principal.",
+      "reason": "While useDeleteUploadedFile is referenced in useQueries.ts, no explicit deleteUploadedFile endpoint is confirmed in the visible backend Motoko code.",
+      "evidence": [
+        "backend/main.mo",
+        "frontend/src/hooks/useQueries.ts"
+      ]
+    }
+  ],
+  "hallucinated_features": [
+    {
+      "description": "Client-side OCR text extraction implemented in frontend/src/lib/ocrExtraction.ts using regex pattern matching on raw file text.",
+      "reason": "The build request constraint explicitly states all OCR logic must remain within the single Motoko actor. Moving OCR to the frontend violates this constraint and was not requested.",
+      "evidence": [
+        "frontend/src/lib/ocrExtraction.ts",
+        "frontend/src/components/UploadRecordForm.tsx"
+      ]
+    }
+  ],
+  "confidence": 0.72,
+  "changed_files": [
+    "backend/main.mo",
+    "backend/migration.mo",
+    "frontend-file-summaries.txt",
+    "frontend/src/components/FileUploadZone.tsx",
+    "frontend/src/components/UploadRecordForm.tsx",
+    "frontend/src/hooks/useQueries.ts",
+    "frontend/src/lib/ocrExtraction.ts",
+    "frontend/src/pages/AddRecordPage.tsx",
+    "frontend/src/types/fileUpload.ts",
+    "project_state.json"
+  ]
+}

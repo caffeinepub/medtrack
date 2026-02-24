@@ -1,0 +1,48 @@
+{
+  "kind": "implementation_plan",
+  "version": "1.0",
+  "title": "Upload Medical Records with OCR Extraction",
+  "requirements": [
+    {
+      "id": "REQ-12",
+      "summary": "Add 'Upload Record' option to the Add Record page UI with file selection, OCR extraction, and form pre-population capabilities",
+      "acceptanceCriteria": [
+        "The Add Record page shows a clearly labelled 'Upload Record' tab or toggle alongside the existing manual entry form.",
+        "The upload area accepts PDF and image files (image/png, image/jpeg, application/pdf) via file picker or drag-and-drop.",
+        "After a file is selected, a loading/processing state is shown while OCR extraction runs.",
+        "On extraction success, the date field, category selector, and relevant metric fields are pre-populated with detected values.",
+        "A read-only 'Extracted Text' expandable section shows the raw OCR output so the user can verify accuracy.",
+        "The user can edit any pre-populated field before submitting the record normally.",
+        "If OCR extraction returns no usable data, a clear error/warning message is shown and the form remains editable.",
+        "File size is validated client-side; files larger than 5 MB show a user-friendly error."
+      ],
+      "file_operations": [
+        {
+          "path": "frontend/src/components/FileUploadZone.tsx",
+          "operation": "create",
+          "description": "Create a reusable file upload component that accepts PDF and image files via file picker or drag-and-drop. Display filename confirmation after selection. Validate file type (image/png, image/jpeg, application/pdf) and size (max 5 MB) client-side, showing user-friendly error messages for invalid files. Use the blob-storage component to create ExternalBlob instances from selected files. Verify the blob-storage component's usage instructions before implementing."
+        },
+        {
+          "path": "frontend/src/components/UploadRecordForm.tsx",
+          "operation": "create",
+          "description": "Create a new form component for the upload flow. Integrate FileUploadZone to handle file selection. After a file is selected, display a loading state while calling backend uploadFileAndGetReference (via blob-storage ExternalBlob.fromBytes) to upload the file temporarily, then call a new backend method to extract OCR data from the uploaded file reference. On extraction success, pre-populate the date field, category selector, and relevant metric fields with detected values. Render an expandable 'Extracted Text' section showing the raw OCR output for user review. Allow the user to edit any pre-populated field before submitting the record using the existing useAddMedicalRecord mutation. Handle extraction errors gracefully with clear warning messages and keep the form editable. Verify the blob-storage component's usage instructions before implementing."
+        },
+        {
+          "path": "frontend/src/pages/AddRecordPage.tsx",
+          "operation": "modify",
+          "description": "Add a tabbed interface using shadcn/ui Tabs component to the Add Record page, showing two tabs: 'Manual Entry' (rendering the existing MedicalRecordForm) and 'Upload Record' (rendering the new UploadRecordForm). Default to the Manual Entry tab. Ensure both tabs are clearly labelled and the existing manual entry form remains fully functional and unaltered."
+        },
+        {
+          "path": "frontend/src/hooks/useQueries.ts",
+          "operation": "modify",
+          "description": "Add React Query mutation hooks for uploading files and triggering OCR extraction: useUploadFile (calls backend uploadFileAndGetReference with ExternalBlob and temporary flag true) and useExtractRecordData (calls a new backend method to extract OCR data from a file reference ID). Both hooks should handle errors and return structured responses. Verify the blob-storage component's usage instructions before implementing."
+        },
+        {
+          "path": "frontend/src/types/fileUpload.ts",
+          "operation": "create",
+          "description": "Define TypeScript types for file upload and OCR extraction, including FileMetadata (fileId, uploadTimestamp, mimeType), ExtractedRecordData (detectedDate, testNameValuePairs array with testName and value, rawExtractedText), and UploadProgress state types. These types mirror the backend OCR extraction response structure."
+        }
+      ]
+    }
+  ]
+}

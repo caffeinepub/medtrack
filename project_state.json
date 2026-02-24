@@ -1,0 +1,162 @@
+{
+  "schemaVersion": "1.0.0",
+  "projectStateVersion": 7,
+  "summary": "Web-based medical records tracker that stores CBC, LFT, Cholesterol, Sugar, BP, and general ailment records tagged with dates. Builds a historical timeline and uses AI to analyze health metric progression over time. Supports user login with separate user consoles and a persistent left-side dashboard panel shown when data is available.",
+  "architectural_notes": [
+    "Web app built with React + Motoko (not Android)",
+    "Medical records stored with date metadata for historical tracking",
+    "User authentication required; each user has an isolated console/data view",
+    "Left-side dashboard panel is conditionally shown based on user data availability",
+    "OCR feature required for PDF/image uploads to extract dates, test names, and test results"
+  ],
+  "known_issues": [],
+  "isFixRequest": false,
+  "existing_features": [
+    {
+      "id": "feature-build-a-medical-record-entry-form-ui-that-allows-users-to-select-a-record-category-cbc-lft-cholesterol-blood-sugar-blood-pressure-general-ailment-fill-in-the-relevant-metric-fields-and-submit-with-a-date-the-form-must-dynamically-display-the-correct-input-fields-based-on-the-selected-category",
+      "title": "Build a medical record entry form UI that allows users to select a record category (CBC, LFT, Cholesterol, Blood Sugar, Blood Pressure, General Ailment), fill in the relevant metric fields, and submit with a date. The form must dynamically display the correct input fields based on the selected category.",
+      "reqIds": [
+        "REQ-2"
+      ],
+      "version": 1
+    },
+    {
+      "id": "feature-build-a-historical-timeline-view-that-displays-all-past-medical-records-in-reverse-chronological-order-records-should-be-groupable-and-filterable-by-category-each-entry-should-show-the-date-category-and-key-metric-values-at-a-glance",
+      "title": "Build a historical timeline view that displays all past medical records in reverse chronological order. Records should be groupable and filterable by category. Each entry should show the date, category, and key metric values at a glance.",
+      "reqIds": [
+        "REQ-3"
+      ],
+      "version": 1
+    },
+    {
+      "id": "feature-build-a-progression-analysis-dashboard-that-charts-health-metric-trends-over-time-using-available-historical-data-for-each-category-with-multiple-data-points-display-a-line-chart-showing-how-values-have-changed-across-dates-include-a-summary-section-that-highlights-notable-trends-such-as-improving-worsening-or-stable-metrics",
+      "title": "Build a progression analysis dashboard that charts health metric trends over time using available historical data. For each category with multiple data points, display a line chart showing how values have changed across dates. Include a summary section that highlights notable trends such as improving, worsening, or stable metrics.",
+      "reqIds": [
+        "REQ-4"
+      ],
+      "version": 1
+    },
+    {
+      "id": "feature-design-and-apply-a-clean-modern-medical-grade-visual-theme-across-the-entire-app-use-a-calm-clinical-aesthetic-with-a-white-and-soft-teal-green-palette-clear-typography-and-card-based-layouts-navigation-should-provide-easy-access-to-add-record-timeline-and-analysis-views",
+      "title": "Design and apply a clean, modern medical-grade visual theme across the entire app. Use a calm, clinical aesthetic with a white and soft teal/green palette, clear typography, and card-based layouts. Navigation should provide easy access to: Add Record, Timeline, and Analysis views.",
+      "reqIds": [
+        "REQ-5"
+      ],
+      "version": 1
+    },
+    {
+      "id": "feature-integrate-internet-identity-authentication-so-that-each-user-must-log-in-before-accessing-any-medical-records-on-the-backend-scope-all-record-storage-and-retrieval-operations-by-the-caller-s-principal-so-each-user-only-sees-and-manages-their-own-records-update-the-add-getall-and-delete-endpoints-to-use-msg-caller-as-the-user-key",
+      "title": "Integrate Internet Identity authentication so that each user must log in before accessing any medical records. On the backend, scope all record storage and retrieval operations by the caller's principal, so each user only sees and manages their own records. Update the add, getAll, and delete endpoints to use `msg.caller` as the user key.",
+      "reqIds": [
+        "REQ-6"
+      ],
+      "version": 1
+    },
+    {
+      "id": "feature-build-a-login-landing-screen-that-is-shown-to-unauthenticated-users-it-should-display-the-meditrack-branding-a-brief-description-of-the-app-and-a-prominent-login-with-internet-identity-button-authenticated-users-must-be-redirected-away-from-this-screen-to-the-main-app-layout",
+      "title": "Build a login/landing screen that is shown to unauthenticated users. It should display the MediTrack branding, a brief description of the app, and a prominent 'Login with Internet Identity' button. Authenticated users must be redirected away from this screen to the main app layout.",
+      "reqIds": [
+        "REQ-7"
+      ],
+      "version": 1
+    },
+    {
+      "id": "feature-redesign-the-main-app-layout-to-include-a-persistent-left-side-dashboard-panel-sidebar-that-is-only-rendered-when-the-authenticated-user-has-at-least-one-medical-record-saved-the-sidebar-should-display-a-compact-summary-of-the-user-s-health-data-record-counts-per-category-most-recent-entry-date-per-category-and-quick-navigation-links-to-the-timeline-and-analysis-pages-the-existing-top-navigation-should-remain-for-primary-page-routing-when-no-records-exist-the-sidebar-is-hidden-and-the-main-content-area-spans-full-width",
+      "title": "Redesign the main app layout to include a persistent left-side dashboard panel (sidebar) that is only rendered when the authenticated user has at least one medical record saved. The sidebar should display a compact summary of the user's health data: record counts per category, most recent entry date per category, and quick-navigation links to the Timeline and Analysis pages. The existing top navigation should remain for primary page routing. When no records exist, the sidebar is hidden and the main content area spans full width.",
+      "reqIds": [
+        "REQ-8"
+      ],
+      "version": 1
+    },
+    {
+      "id": "feature-add-a-user-identity-indicator-in-the-top-navigation-bar-for-authenticated-users-display-a-truncated-version-of-the-user-s-principal-or-a-generic-avatar-icon-and-a-logout-button-or-menu-that-calls-the-internet-identity-logout-function-and-returns-the-user-to-the-login-screen",
+      "title": "Add a user identity indicator in the top navigation bar for authenticated users. Display a truncated version of the user's principal (or a generic avatar icon) and a 'Logout' button or menu that calls the Internet Identity logout function and returns the user to the login screen.",
+      "reqIds": [
+        "REQ-9"
+      ],
+      "version": 1
+    },
+    {
+      "id": "feature-add-an-upload-record-option-to-the-add-record-page-ui-the-upload-flow-must-allow-the-user-to-select-or-drag-and-drop-a-pdf-or-image-file-display-a-preview-or-filename-confirmation-trigger-ocr-extraction-on-the-uploaded-file-and-pre-populate-the-medical-record-form-fields-date-category-and-metric-values-with-the-extracted-data-for-user-review-and-correction-before-submission",
+      "title": "Add an 'Upload Record' option to the Add Record page UI. The upload flow must allow the user to select or drag-and-drop a PDF or image file, display a preview or filename confirmation, trigger OCR extraction on the uploaded file, and pre-populate the medical record form fields (date, category, and metric values) with the extracted data for user review and correction before submission.",
+      "reqIds": [
+        "REQ-12"
+      ],
+      "version": 1
+    }
+  ],
+  "new_feature_requests": [
+    {
+      "id": "AR-1",
+      "summary": "Medical record entry for CBC, LFT, Cholesterol, Sugar, BP, and general ailments with date tagging",
+      "reqIds": [],
+      "status": "pending"
+    },
+    {
+      "id": "AR-2",
+      "summary": "Historical timeline view of all medical records",
+      "reqIds": [],
+      "status": "pending"
+    },
+    {
+      "id": "AR-3",
+      "summary": "AI-powered analysis of health metric progression over time",
+      "reqIds": [],
+      "status": "pending"
+    },
+    {
+      "id": "AR-4",
+      "summary": "Create a backend data model and API to store medical records with the following categories: CBC (Complete Blood Count), LFT (Liver Function Test), Cholesterol, Blood Sugar, Blood Pressure, and General Ailments. Each record must be tagged with a date and record type. Support create, read, and delete operations.",
+      "reqIds": [
+        "REQ-1"
+      ],
+      "status": "pending"
+    },
+    {
+      "id": "AR-5",
+      "summary": "User login and authentication with separate user consoles (each user sees only their own records)",
+      "reqIds": [],
+      "status": "pending"
+    },
+    {
+      "id": "AR-6",
+      "summary": "Persistent left-side dashboard panel that appears when the logged-in user has data available",
+      "reqIds": [],
+      "status": "pending"
+    },
+    {
+      "id": "AR-7",
+      "summary": "Upload medical records as PDF or image files; use OCR to extract dates, test names, and test results automatically",
+      "reqIds": [],
+      "status": "pending"
+    },
+    {
+      "id": "AR-8",
+      "summary": "Add a backend endpoint that accepts an uploaded file (PDF or image encoded as binary/base64), stores the raw file data per principal, and returns a stable reference ID for the uploaded asset.",
+      "reqIds": [
+        "REQ-10"
+      ],
+      "status": "pending"
+    },
+    {
+      "id": "AR-9",
+      "summary": "Add a backend OCR processing endpoint that takes a stored file reference ID, performs text extraction on the file content, and returns structured fields: detected date, test names, and test result values parsed from the extracted text.",
+      "reqIds": [
+        "REQ-11"
+      ],
+      "status": "pending"
+    },
+    {
+      "id": "AR-11",
+      "summary": "Add a `listUploadedFiles` backend endpoint that returns metadata (file ID, upload timestamp, MIME type) for all files uploaded by the calling principal, and a `deleteUploadedFile` endpoint to remove a file by ID.",
+      "reqIds": [
+        "REQ-13"
+      ],
+      "status": "pending"
+    }
+  ],
+  "gameProjectType": "none",
+  "projectName": "MediTrack",
+  "clarification_mode": "instant",
+  "clarification_rounds": 0
+}

@@ -1,0 +1,29 @@
+{
+  "kind": "feature_evidence_report",
+  "features": [
+    {
+      "featureId": "feature-add-an-upload-record-option-to-the-add-record-page-ui-the-upload-flow-must-allow-the-user-to-select-or-drag-and-drop-a-pdf-or-image-file-display-a-preview-or-filename-confirmation-trigger-ocr-extraction-on-the-uploaded-file-and-pre-populate-the-medical-record-form-fields-date-category-and-metric-values-with-the-extracted-data-for-user-review-and-correction-before-submission",
+      "featureTitle": "Add an 'Upload Record' option to the Add Record page UI. The upload flow must allow the user to select or drag-and-drop a PDF or image file, display a preview or filename confirmation, trigger OCR extraction on the uploaded file, and pre-populate the medical record form fields (date, category, and metric values) with the extracted data for user review and correction before submission.",
+      "files": [
+        "frontend/src/components/FileUploadZone.tsx",
+        "frontend/src/components/UploadRecordForm.tsx",
+        "frontend/src/hooks/useQueries.ts",
+        "frontend/src/pages/AddRecordPage.tsx",
+        "frontend/src/types/fileUpload.ts"
+      ],
+      "components": [
+        "core-infrastructure@1.0.2",
+        "shadcn-ui@1.0.0",
+        "build-template-react@1.0.0",
+        "initial-app@1.0.0",
+        "github-export-icp-cli@1.0.0",
+        "authorization@4.0.0",
+        "blob-storage@4.0.0"
+      ],
+      "testIds": [
+        "REQ-12"
+      ],
+      "confidence": "high"
+    }
+  ]
+}
