@@ -64,10 +64,18 @@ function CategoryAnalysis({
   }
 
   // Build chart-compatible records: { date: number; data: Record<string, string> }
-  const recordsForChart = categoryRecords.map((r) => ({
-    date: Number(r.recordDate),
-    data: r.data as Record<string, string>,
-  }));
+  const recordsForChart = categoryRecords.map((r) => {
+    let parsedData: Record<string, string> = {};
+    try {
+      parsedData = JSON.parse(r.data) as Record<string, string>;
+    } catch {
+      parsedData = { notes: r.data };
+    }
+    return {
+      date: Number(r.recordDate),
+      data: parsedData,
+    };
+  });
 
   const chartData = buildChartData(recordsForChart, metricDefs.map((m) => m.key));
 
@@ -119,7 +127,6 @@ function CategoryAnalysis({
 }
 
 export function AnalysisDashboard() {
-  const { data: allRecords } = useGetAllRecords(null);
   const [activeCategory, setActiveCategory] = useState<RecordType>(RecordType.CBC);
   const [selectedMemberId, setSelectedMemberId] = useState<string>('__personal__');
 

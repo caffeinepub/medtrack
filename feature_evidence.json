@@ -2,10 +2,14 @@
   "kind": "feature_evidence_report",
   "features": [
     {
-      "featureId": "feature-fix-the-date-extraction-logic-in-frontend-src-lib-ocrextraction-ts-so-that-the-report-date-is-reliably-detected-from-uploaded-medical-report-documents-expand-the-regex-patterns-to-cover-common-date-formats-found-in-medical-reports-including-but-not-limited-to-dd-mm-yyyy-mm-dd-yyyy-yyyy-mm-dd-dd-mm-yyyy-dd-mmm-yyyy-e-g-12-jan-2024-mmm-dd-yyyy-e-g-jan-12-2024-and-label-prefixed-formats-such-as-date-report-date-collection-date-sample-date-test-date-and-date-of-report-the-extracted-date-must-be-returned-as-a-valid-iso-date-string-yyyy-mm-dd-in-the-extractedtestdata-result-and-pre-populated-in-the-date-field-of-each-extracted-record-displayed-in-the-uploadrecordform-component",
-      "featureTitle": "Fix the date extraction logic in `frontend/src/lib/ocrExtraction.ts` so that the report date is reliably detected from uploaded medical report documents. Expand the regex patterns to cover common date formats found in medical reports, including but not limited to: 'DD/MM/YYYY', 'MM/DD/YYYY', 'YYYY-MM-DD', 'DD-MM-YYYY', 'DD MMM YYYY' (e.g., '12 Jan 2024'), 'MMM DD, YYYY' (e.g., 'Jan 12, 2024'), and label-prefixed formats such as 'Date:', 'Report Date:', 'Collection Date:', 'Sample Date:', 'Test Date:', and 'Date of Report:'. The extracted date must be returned as a valid ISO date string (YYYY-MM-DD) in the `ExtractedTestData` result and pre-populated in the date field of each extracted record displayed in the `UploadRecordForm` component.",
+      "featureId": "feature-add-a-dedicated-records-section-page-where-authenticated-users-can-see-all-their-uploaded-pdfs-and-images-each-record-entry-should-display-a-thumbnail-or-file-type-icon-the-file-name-upload-date-and-extracted-metadata-e-g-patient-name-record-date-the-list-must-be-private-each-user-only-sees-their-own-files",
+      "featureTitle": "Add a dedicated 'Records' section/page where authenticated users can see all their uploaded PDFs and images. Each record entry should display a thumbnail or file-type icon, the file name, upload date, and extracted metadata (e.g., patient name, record date). The list must be private — each user only sees their own files.",
       "files": [
-        "frontend/src/lib/ocrExtraction.ts"
+        "frontend/src/App.tsx",
+        "frontend/src/components/Navigation.tsx",
+        "frontend/src/components/RecordsList.tsx",
+        "frontend/src/hooks/useQueries.ts",
+        "frontend/src/pages/RecordsPage.tsx"
       ],
       "components": [
         "core-infrastructure@1.0.2",
@@ -17,7 +21,92 @@
         "blob-storage@4.0.0"
       ],
       "testIds": [
-        "REQ-19"
+        "REQ-1"
+      ],
+      "confidence": "high"
+    },
+    {
+      "featureId": "feature-enable-in-app-viewing-of-uploaded-pdfs-and-images-clicking-a-record-should-open-the-file-in-a-modal-or-dedicated-viewer-pdfs-rendered-in-an-embedded-pdf-viewer-e-g-using-an-iframe-or-object-tag-with-the-blob-url-and-images-displayed-in-a-lightbox-style-modal",
+      "featureTitle": "Enable in-app viewing of uploaded PDFs and images. Clicking a record should open the file in a modal or dedicated viewer — PDFs rendered in an embedded PDF viewer (e.g., using an iframe or object tag with the blob URL) and images displayed in a lightbox-style modal.",
+      "files": [
+        "frontend/src/components/FileViewerModal.tsx",
+        "frontend/src/components/RecordsList.tsx"
+      ],
+      "components": [
+        "core-infrastructure@1.0.2",
+        "shadcn-ui@1.0.0",
+        "build-template-react@1.0.0",
+        "initial-app@1.0.0",
+        "github-export-icp-cli@1.0.0",
+        "authorization@4.0.0",
+        "blob-storage@4.0.0"
+      ],
+      "testIds": [
+        "REQ-2"
+      ],
+      "confidence": "high"
+    },
+    {
+      "featureId": "feature-add-a-delete-action-to-each-record-in-the-records-page-a-delete-button-on-each-record-entry-should-prompt-for-confirmation-before-permanently-removing-both-the-file-blob-and-its-metadata-from-the-backend",
+      "featureTitle": "Add a delete action to each record in the Records page. A delete button on each record entry should prompt for confirmation before permanently removing both the file blob and its metadata from the backend.",
+      "files": [
+        "frontend/src/components/RecordsList.tsx",
+        "frontend/src/hooks/useQueries.ts"
+      ],
+      "components": [
+        "core-infrastructure@1.0.2",
+        "shadcn-ui@1.0.0",
+        "build-template-react@1.0.0",
+        "initial-app@1.0.0",
+        "github-export-icp-cli@1.0.0",
+        "authorization@4.0.0",
+        "blob-storage@4.0.0"
+      ],
+      "testIds": [
+        "REQ-4"
+      ],
+      "confidence": "high"
+    },
+    {
+      "featureId": "feature-add-search-and-filter-controls-to-the-records-page-users-should-be-able-to-search-records-by-file-name-or-extracted-patient-name-and-filter-by-date-range-from-to-date-pickers-results-should-update-reactively-as-the-user-types-or-changes-filters",
+      "featureTitle": "Add search and filter controls to the Records page. Users should be able to search records by file name or extracted patient name, and filter by date range (from/to date pickers). Results should update reactively as the user types or changes filters.",
+      "files": [
+        "frontend/src/components/RecordsFilters.tsx",
+        "frontend/src/pages/RecordsPage.tsx"
+      ],
+      "components": [
+        "core-infrastructure@1.0.2",
+        "shadcn-ui@1.0.0",
+        "build-template-react@1.0.0",
+        "initial-app@1.0.0",
+        "github-export-icp-cli@1.0.0",
+        "authorization@4.0.0",
+        "blob-storage@4.0.0"
+      ],
+      "testIds": [
+        "REQ-5"
+      ],
+      "confidence": "high"
+    },
+    {
+      "featureId": "feature-automatically-extract-key-information-from-uploaded-pdfs-and-images-upon-upload-at-minimum-attempt-to-extract-record-date-and-patient-name-using-the-existing-ocr-extraction-utility-ocrextraction-ts-display-extracted-fields-alongside-the-file-in-the-records-list-and-allow-the-user-to-review-edit-them-before-saving",
+      "featureTitle": "Automatically extract key information from uploaded PDFs and images upon upload. At minimum, attempt to extract: record date and patient name using the existing OCR extraction utility (ocrExtraction.ts). Display extracted fields alongside the file in the Records list and allow the user to review/edit them before saving.",
+      "files": [
+        "frontend/src/components/FileUploadWithExtraction.tsx",
+        "frontend/src/hooks/useQueries.ts",
+        "frontend/src/pages/RecordsPage.tsx"
+      ],
+      "components": [
+        "core-infrastructure@1.0.2",
+        "shadcn-ui@1.0.0",
+        "build-template-react@1.0.0",
+        "initial-app@1.0.0",
+        "github-export-icp-cli@1.0.0",
+        "authorization@4.0.0",
+        "blob-storage@4.0.0"
+      ],
+      "testIds": [
+        "REQ-6"
       ],
       "confidence": "high"
     }

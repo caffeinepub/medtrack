@@ -139,17 +139,21 @@ export interface backendInterface {
     createFamilyMember(name: string): Promise<string>;
     deleteFamilyMember(profileId: string): Promise<void>;
     deleteMedicalRecord(recordId: string, familyMemberId: string | null): Promise<void>;
+    deleteRecord(recordId: string): Promise<void>;
     deleteUploadedFile(fileId: string, isTemporary: boolean): Promise<void>;
     getAllRecords(familyMemberId: string | null): Promise<Array<MedicalRecord>>;
     getCallerUserProfile(): Promise<UserProfile | null>;
     getCallerUserRole(): Promise<UserRole>;
     getMedicalRecord(recordId: string, familyMemberId: string | null): Promise<MedicalRecord>;
+    getRecordDetails(recordId: string): Promise<ExternalBlob | null>;
     getRecordsByType(recordType: RecordType, familyMemberId: string | null): Promise<Array<MedicalRecord>>;
     getUserProfile(user: Principal): Promise<UserProfile | null>;
+    getUserRecords(): Promise<Array<[string, ExternalBlob]>>;
     hasMedicalRecordAccess(): Promise<boolean>;
     isCallerAdmin(): Promise<boolean>;
     listFamilyMembers(): Promise<Array<FamilyMemberProfile>>;
     listUploadedFiles(): Promise<Array<[string, ExternalBlob]>>;
+    listUserFiles(): Promise<Array<[string, ExternalBlob]>>;
     recordExists(recordId: string, familyMemberId: string | null): Promise<boolean>;
     saveCallerUserProfile(profile: UserProfile): Promise<void>;
     uploadFileAndGetReference(blob: ExternalBlob, fileId: string, isTemporary: boolean): Promise<string>;
@@ -325,6 +329,20 @@ export class Backend implements backendInterface {
             return result;
         }
     }
+    async deleteRecord(arg0: string): Promise<void> {
+        if (this.processError) {
+            try {
+                const result = await this.actor.deleteRecord(arg0);
+                return result;
+            } catch (e) {
+                this.processError(e);
+                throw new Error("unreachable");
+            }
+        } else {
+            const result = await this.actor.deleteRecord(arg0);
+            return result;
+        }
+    }
     async deleteUploadedFile(arg0: string, arg1: boolean): Promise<void> {
         if (this.processError) {
             try {
@@ -395,6 +413,20 @@ export class Backend implements backendInterface {
             return from_candid_MedicalRecord_n14(this._uploadFile, this._downloadFile, result);
         }
     }
+    async getRecordDetails(arg0: string): Promise<ExternalBlob | null> {
+        if (this.processError) {
+            try {
+                const result = await this.actor.getRecordDetails(arg0);
+                return from_candid_opt_n21(this._uploadFile, this._downloadFile, result);
+            } catch (e) {
+                this.processError(e);
+                throw new Error("unreachable");
+            }
+        } else {
+            const result = await this.actor.getRecordDetails(arg0);
+            return from_candid_opt_n21(this._uploadFile, this._downloadFile, result);
+        }
+    }
     async getRecordsByType(arg0: RecordType, arg1: string | null): Promise<Array<MedicalRecord>> {
         if (this.processError) {
             try {
@@ -421,6 +453,20 @@ export class Backend implements backendInterface {
         } else {
             const result = await this.actor.getUserProfile(arg0);
             return from_candid_opt_n18(this._uploadFile, this._downloadFile, result);
+        }
+    }
+    async getUserRecords(): Promise<Array<[string, ExternalBlob]>> {
+        if (this.processError) {
+            try {
+                const result = await this.actor.getUserRecords();
+                return from_candid_vec_n23(this._uploadFile, this._downloadFile, result);
+            } catch (e) {
+                this.processError(e);
+                throw new Error("unreachable");
+            }
+        } else {
+            const result = await this.actor.getUserRecords();
+            return from_candid_vec_n23(this._uploadFile, this._downloadFile, result);
         }
     }
     async hasMedicalRecordAccess(): Promise<boolean> {
@@ -469,14 +515,28 @@ export class Backend implements backendInterface {
         if (this.processError) {
             try {
                 const result = await this.actor.listUploadedFiles();
-                return from_candid_vec_n21(this._uploadFile, this._downloadFile, result);
+                return from_candid_vec_n23(this._uploadFile, this._downloadFile, result);
             } catch (e) {
                 this.processError(e);
                 throw new Error("unreachable");
             }
         } else {
             const result = await this.actor.listUploadedFiles();
-            return from_candid_vec_n21(this._uploadFile, this._downloadFile, result);
+            return from_candid_vec_n23(this._uploadFile, this._downloadFile, result);
+        }
+    }
+    async listUserFiles(): Promise<Array<[string, ExternalBlob]>> {
+        if (this.processError) {
+            try {
+                const result = await this.actor.listUserFiles();
+                return from_candid_vec_n23(this._uploadFile, this._downloadFile, result);
+            } catch (e) {
+                this.processError(e);
+                throw new Error("unreachable");
+            }
+        } else {
+            const result = await this.actor.listUserFiles();
+            return from_candid_vec_n23(this._uploadFile, this._downloadFile, result);
         }
     }
     async recordExists(arg0: string, arg1: string | null): Promise<boolean> {
@@ -510,19 +570,19 @@ export class Backend implements backendInterface {
     async uploadFileAndGetReference(arg0: ExternalBlob, arg1: string, arg2: boolean): Promise<string> {
         if (this.processError) {
             try {
-                const result = await this.actor.uploadFileAndGetReference(await to_candid_ExternalBlob_n24(this._uploadFile, this._downloadFile, arg0), arg1, arg2);
+                const result = await this.actor.uploadFileAndGetReference(await to_candid_ExternalBlob_n25(this._uploadFile, this._downloadFile, arg0), arg1, arg2);
                 return result;
             } catch (e) {
                 this.processError(e);
                 throw new Error("unreachable");
             }
         } else {
-            const result = await this.actor.uploadFileAndGetReference(await to_candid_ExternalBlob_n24(this._uploadFile, this._downloadFile, arg0), arg1, arg2);
+            const result = await this.actor.uploadFileAndGetReference(await to_candid_ExternalBlob_n25(this._uploadFile, this._downloadFile, arg0), arg1, arg2);
             return result;
         }
     }
 }
-async function from_candid_ExternalBlob_n23(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: _ExternalBlob): Promise<ExternalBlob> {
+async function from_candid_ExternalBlob_n22(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: _ExternalBlob): Promise<ExternalBlob> {
     return await _downloadFile(value);
 }
 function from_candid_MedicalRecord_n14(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: _MedicalRecord): MedicalRecord {
@@ -539,6 +599,9 @@ function from_candid__CaffeineStorageRefillResult_n4(_uploadFile: (file: Externa
 }
 function from_candid_opt_n18(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: [] | [_UserProfile]): UserProfile | null {
     return value.length === 0 ? null : value[0];
+}
+async function from_candid_opt_n21(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: [] | [_ExternalBlob]): Promise<ExternalBlob | null> {
+    return value.length === 0 ? null : await from_candid_ExternalBlob_n22(_uploadFile, _downloadFile, value[0]);
 }
 function from_candid_opt_n6(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: [] | [boolean]): boolean | null {
     return value.length === 0 ? null : value[0];
@@ -576,10 +639,10 @@ function from_candid_record_n5(_uploadFile: (file: ExternalBlob) => Promise<Uint
         topped_up_amount: record_opt_to_undefined(from_candid_opt_n7(_uploadFile, _downloadFile, value.topped_up_amount))
     };
 }
-async function from_candid_tuple_n22(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: [string, _ExternalBlob]): Promise<[string, ExternalBlob]> {
+async function from_candid_tuple_n24(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: [string, _ExternalBlob]): Promise<[string, ExternalBlob]> {
     return [
         value[0],
-        await from_candid_ExternalBlob_n23(_uploadFile, _downloadFile, value[1])
+        await from_candid_ExternalBlob_n22(_uploadFile, _downloadFile, value[1])
     ];
 }
 function from_candid_variant_n17(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: {
@@ -609,10 +672,10 @@ function from_candid_variant_n20(_uploadFile: (file: ExternalBlob) => Promise<Ui
 function from_candid_vec_n13(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: Array<_MedicalRecord>): Array<MedicalRecord> {
     return value.map((x)=>from_candid_MedicalRecord_n14(_uploadFile, _downloadFile, x));
 }
-async function from_candid_vec_n21(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: Array<[string, _ExternalBlob]>): Promise<Array<[string, ExternalBlob]>> {
-    return await Promise.all(value.map(async (x)=>await from_candid_tuple_n22(_uploadFile, _downloadFile, x)));
+async function from_candid_vec_n23(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: Array<[string, _ExternalBlob]>): Promise<Array<[string, ExternalBlob]>> {
+    return await Promise.all(value.map(async (x)=>await from_candid_tuple_n24(_uploadFile, _downloadFile, x)));
 }
-async function to_candid_ExternalBlob_n24(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: ExternalBlob): Promise<_ExternalBlob> {
+async function to_candid_ExternalBlob_n25(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: ExternalBlob): Promise<_ExternalBlob> {
     return await _uploadFile(value);
 }
 function to_candid_RecordType_n8(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: RecordType): _RecordType {

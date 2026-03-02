@@ -39,11 +39,11 @@ export const MedicalRecord = IDL.Record({
   'recordId' : IDL.Text,
 });
 export const UserProfile = IDL.Record({ 'name' : IDL.Text });
+export const ExternalBlob = IDL.Vec(IDL.Nat8);
 export const FamilyMemberProfile = IDL.Record({
   'name' : IDL.Text,
   'profileId' : IDL.Text,
 });
-export const ExternalBlob = IDL.Vec(IDL.Nat8);
 
 export const idlService = IDL.Service({
   '_caffeineStorageBlobIsLive' : IDL.Func(
@@ -82,6 +82,7 @@ export const idlService = IDL.Service({
   'createFamilyMember' : IDL.Func([IDL.Text], [IDL.Text], []),
   'deleteFamilyMember' : IDL.Func([IDL.Text], [], []),
   'deleteMedicalRecord' : IDL.Func([IDL.Text, IDL.Opt(IDL.Text)], [], []),
+  'deleteRecord' : IDL.Func([IDL.Text], [], []),
   'deleteUploadedFile' : IDL.Func([IDL.Text, IDL.Bool], [], []),
   'getAllRecords' : IDL.Func(
       [IDL.Opt(IDL.Text)],
@@ -95,6 +96,7 @@ export const idlService = IDL.Service({
       [MedicalRecord],
       ['query'],
     ),
+  'getRecordDetails' : IDL.Func([IDL.Text], [IDL.Opt(ExternalBlob)], ['query']),
   'getRecordsByType' : IDL.Func(
       [RecordType, IDL.Opt(IDL.Text)],
       [IDL.Vec(MedicalRecord)],
@@ -105,10 +107,20 @@ export const idlService = IDL.Service({
       [IDL.Opt(UserProfile)],
       ['query'],
     ),
+  'getUserRecords' : IDL.Func(
+      [],
+      [IDL.Vec(IDL.Tuple(IDL.Text, ExternalBlob))],
+      ['query'],
+    ),
   'hasMedicalRecordAccess' : IDL.Func([], [IDL.Bool], ['query']),
   'isCallerAdmin' : IDL.Func([], [IDL.Bool], ['query']),
   'listFamilyMembers' : IDL.Func([], [IDL.Vec(FamilyMemberProfile)], ['query']),
   'listUploadedFiles' : IDL.Func(
+      [],
+      [IDL.Vec(IDL.Tuple(IDL.Text, ExternalBlob))],
+      ['query'],
+    ),
+  'listUserFiles' : IDL.Func(
       [],
       [IDL.Vec(IDL.Tuple(IDL.Text, ExternalBlob))],
       ['query'],
@@ -160,11 +172,11 @@ export const idlFactory = ({ IDL }) => {
     'recordId' : IDL.Text,
   });
   const UserProfile = IDL.Record({ 'name' : IDL.Text });
+  const ExternalBlob = IDL.Vec(IDL.Nat8);
   const FamilyMemberProfile = IDL.Record({
     'name' : IDL.Text,
     'profileId' : IDL.Text,
   });
-  const ExternalBlob = IDL.Vec(IDL.Nat8);
   
   return IDL.Service({
     '_caffeineStorageBlobIsLive' : IDL.Func(
@@ -203,6 +215,7 @@ export const idlFactory = ({ IDL }) => {
     'createFamilyMember' : IDL.Func([IDL.Text], [IDL.Text], []),
     'deleteFamilyMember' : IDL.Func([IDL.Text], [], []),
     'deleteMedicalRecord' : IDL.Func([IDL.Text, IDL.Opt(IDL.Text)], [], []),
+    'deleteRecord' : IDL.Func([IDL.Text], [], []),
     'deleteUploadedFile' : IDL.Func([IDL.Text, IDL.Bool], [], []),
     'getAllRecords' : IDL.Func(
         [IDL.Opt(IDL.Text)],
@@ -216,6 +229,11 @@ export const idlFactory = ({ IDL }) => {
         [MedicalRecord],
         ['query'],
       ),
+    'getRecordDetails' : IDL.Func(
+        [IDL.Text],
+        [IDL.Opt(ExternalBlob)],
+        ['query'],
+      ),
     'getRecordsByType' : IDL.Func(
         [RecordType, IDL.Opt(IDL.Text)],
         [IDL.Vec(MedicalRecord)],
@@ -226,6 +244,11 @@ export const idlFactory = ({ IDL }) => {
         [IDL.Opt(UserProfile)],
         ['query'],
       ),
+    'getUserRecords' : IDL.Func(
+        [],
+        [IDL.Vec(IDL.Tuple(IDL.Text, ExternalBlob))],
+        ['query'],
+      ),
     'hasMedicalRecordAccess' : IDL.Func([], [IDL.Bool], ['query']),
     'isCallerAdmin' : IDL.Func([], [IDL.Bool], ['query']),
     'listFamilyMembers' : IDL.Func(
@@ -234,6 +257,11 @@ export const idlFactory = ({ IDL }) => {
         ['query'],
       ),
     'listUploadedFiles' : IDL.Func(
+        [],
+        [IDL.Vec(IDL.Tuple(IDL.Text, ExternalBlob))],
+        ['query'],
+      ),
+    'listUserFiles' : IDL.Func(
         [],
         [IDL.Vec(IDL.Tuple(IDL.Text, ExternalBlob))],
         ['query'],

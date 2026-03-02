@@ -172,7 +172,12 @@ export function MedicalRecordForm() {
             max={getTodayString()}
             onChange={(e) => {
               setDate(e.target.value);
-              if (errors.date) setErrors((prev) => { const n = { ...prev }; delete n.date; return n; });
+              if (errors.date)
+                setErrors((prev) => {
+                  const n = { ...prev };
+                  delete n.date;
+                  return n;
+                });
             }}
             className={errors.date ? 'border-destructive' : ''}
           />
@@ -206,11 +211,7 @@ export function MedicalRecordForm() {
 
       {/* Submit */}
       <div className="flex justify-end pt-2">
-        <Button
-          type="submit"
-          disabled={addRecord.isPending}
-          className="min-w-[140px]"
-        >
+        <Button type="submit" disabled={addRecord.isPending} className="min-w-[140px]">
           {addRecord.isPending ? (
             <>
               <Loader2 className="w-4 h-4 mr-2 animate-spin" />

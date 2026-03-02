@@ -1,34 +1,124 @@
 {
   "kind": "coverage_report",
   "version": "1.0",
-  "generatedAt": "2026-02-24T17:59:05.418Z",
+  "generatedAt": "2026-03-02T18:03:36.992Z",
   "sources": {
     "buildRequest": true,
     "implementationPlan": true
   },
   "requirements": {
-    "total": 1,
-    "implemented": 1,
+    "total": 6,
+    "implemented": 5,
     "items": [
       {
-        "id": "REQ-19",
-        "summary": "Fix the date extraction logic in `frontend/src/lib/ocrExtraction.ts` so that the report date is reliably detected from uploaded medical report documents. Expand the regex patterns to cover common date formats found in medical reports, including but not limited to: 'DD/MM/YYYY', 'MM/DD/YYYY', 'YYYY-MM-DD', 'DD-MM-YYYY', 'DD MMM YYYY' (e.g., '12 Jan 2024'), 'MMM DD, YYYY' (e.g., 'Jan 12, 2024'), and label-prefixed formats such as 'Date:', 'Report Date:', 'Collection Date:', 'Sample Date:', 'Test Date:', and 'Date of Report:'. The extracted date must be returned as a valid ISO date string (YYYY-MM-DD) in the `ExtractedTestData` result and pre-populated in the date field of each extracted record displayed in the `UploadRecordForm` component.",
+        "id": "REQ-1",
+        "summary": "Add a dedicated 'Records' section/page where authenticated users can see all their uploaded PDFs and images. Each record entry should display a thumbnail or file-type icon, the file name, upload date, and extracted metadata (e.g., patient name, record date). The list must be private — each user only sees their own files.",
         "status": "implemented",
         "plannedFiles": [
-          "frontend/src/lib/ocrExtraction.ts"
+          "frontend/src/pages/RecordsPage.tsx",
+          "frontend/src/hooks/useQueries.ts",
+          "frontend/src/components/RecordsList.tsx",
+          "frontend/src/components/Navigation.tsx",
+          "frontend/src/App.tsx"
         ],
         "matchedFiles": [
-          "frontend/src/lib/ocrExtraction.ts"
+          "frontend/src/pages/RecordsPage.tsx",
+          "frontend/src/hooks/useQueries.ts",
+          "frontend/src/components/RecordsList.tsx",
+          "frontend/src/components/Navigation.tsx",
+          "frontend/src/App.tsx"
+        ]
+      },
+      {
+        "id": "REQ-2",
+        "summary": "Enable in-app viewing of uploaded PDFs and images. Clicking a record should open the file in a modal or dedicated viewer — PDFs rendered in an embedded PDF viewer (e.g., using an iframe or object tag with the blob URL) and images displayed in a lightbox-style modal.",
+        "status": "implemented",
+        "plannedFiles": [
+          "frontend/src/components/FileViewerModal.tsx",
+          "frontend/src/components/RecordsList.tsx"
+        ],
+        "matchedFiles": [
+          "frontend/src/components/FileViewerModal.tsx",
+          "frontend/src/components/RecordsList.tsx"
+        ]
+      },
+      {
+        "id": "REQ-3",
+        "summary": "Store uploaded PDF and image file blobs in the backend per user. Each stored record should track: the file blob (Blob), MIME type, original file name, upload timestamp, and the user's principal as the owner. Retrieval must be scoped to the calling user's principal.",
+        "status": "unknown",
+        "plannedFiles": [],
+        "matchedFiles": []
+      },
+      {
+        "id": "REQ-4",
+        "summary": "Add a delete action to each record in the Records page. A delete button on each record entry should prompt for confirmation before permanently removing both the file blob and its metadata from the backend.",
+        "status": "implemented",
+        "plannedFiles": [
+          "frontend/src/hooks/useQueries.ts",
+          "frontend/src/components/RecordsList.tsx"
+        ],
+        "matchedFiles": [
+          "frontend/src/hooks/useQueries.ts",
+          "frontend/src/components/RecordsList.tsx"
+        ]
+      },
+      {
+        "id": "REQ-5",
+        "summary": "Add search and filter controls to the Records page. Users should be able to search records by file name or extracted patient name, and filter by date range (from/to date pickers). Results should update reactively as the user types or changes filters.",
+        "status": "implemented",
+        "plannedFiles": [
+          "frontend/src/components/RecordsFilters.tsx",
+          "frontend/src/pages/RecordsPage.tsx"
+        ],
+        "matchedFiles": [
+          "frontend/src/components/RecordsFilters.tsx",
+          "frontend/src/pages/RecordsPage.tsx"
+        ]
+      },
+      {
+        "id": "REQ-6",
+        "summary": "Automatically extract key information from uploaded PDFs and images upon upload. At minimum, attempt to extract: record date and patient name using the existing OCR extraction utility (ocrExtraction.ts). Display extracted fields alongside the file in the Records list and allow the user to review/edit them before saving.",
+        "status": "implemented",
+        "plannedFiles": [
+          "frontend/src/components/FileUploadWithExtraction.tsx",
+          "frontend/src/pages/RecordsPage.tsx",
+          "frontend/src/hooks/useQueries.ts"
+        ],
+        "matchedFiles": [
+          "frontend/src/components/FileUploadWithExtraction.tsx",
+          "frontend/src/pages/RecordsPage.tsx",
+          "frontend/src/hooks/useQueries.ts"
         ]
       }
     ]
   },
   "changedFiles": [
+    "backend/main.mo",
     "build-request.json",
+    "build-template/README.md",
+    "caffeine.lock.json",
     "feature_evidence.json",
     "frontend-file-summaries.txt",
     "frontend-implementation-plan.json",
+    "frontend/src/App.tsx",
+    "frontend/src/backend.d.ts",
+    "frontend/src/backend.ts",
+    "frontend/src/components/AnalysisDashboard.tsx",
+    "frontend/src/components/DashboardSidebar.tsx",
+    "frontend/src/components/FileUploadWithExtraction.tsx",
+    "frontend/src/components/FileUploadZone.tsx",
+    "frontend/src/components/FileViewerModal.tsx",
+    "frontend/src/components/MedicalRecordForm.tsx",
+    "frontend/src/components/Navigation.tsx",
+    "frontend/src/components/RecordsFilters.tsx",
+    "frontend/src/components/RecordsList.tsx",
+    "frontend/src/components/TimelineCard.tsx",
+    "frontend/src/components/UploadRecordForm.tsx",
+    "frontend/src/declarations/backend.did.d.ts",
+    "frontend/src/declarations/backend.did.js",
+    "frontend/src/hooks/useQueries.ts",
     "frontend/src/lib/ocrExtraction.ts",
+    "frontend/src/pages/RecordsPage.tsx",
     "project_state.json",
     "scratch/component-selection.json",
     "spec.md",

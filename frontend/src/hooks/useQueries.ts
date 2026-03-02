@@ -8,21 +8,15 @@ export interface ParsedMedicalRecord {
   recordId: string;
   recordDate: bigint;
   recordType: RecordType;
-  data: Record<string, string>;
+  data: string;
 }
 
 function parseRecord(record: MedicalRecord): ParsedMedicalRecord {
-  let data: Record<string, string> = {};
-  try {
-    data = JSON.parse(record.data) as Record<string, string>;
-  } catch {
-    data = { notes: record.data };
-  }
   return {
     recordId: record.recordId,
     recordDate: record.recordDate,
     recordType: record.recordType,
-    data,
+    data: record.data,
   };
 }
 
@@ -167,35 +161,133 @@ export function useDeleteMedicalRecord() {
   });
 }
 
-// ── File Upload ───────────────────────────────────────────────────────────────
+// ── File Records (PDF/Image uploads) ─────────────────────────────────────────
+
+export type FileRecord = {
+  fileId: string;
+  blob: ExternalBlob;
+  fileName: string;
+  mimeType: string;
+  uploadTimestamp: number;
+  patientName?: string;
+  recordDate?: string;
+};
+
+function parseFileId(fileId: string): {
+  fileName: string;
+  mimeType: string;
+  uploadTimestamp: number;
+  patientName?: string;
+  recordDate?: string;
+} {
+  // fileId format: "timestamp__fileName__patientName__recordDate"
+  try {
+    const parts = fileId.split('__');
+    if (parts.length >= 2) {
+      const timestamp = parseInt(parts[0], 10);
+      const fileName = parts[1];
+      const ext = fileName.split('.').pop()?.toLowerCase() ?? '';
+      const mimeType =
+        ext === 'pdf' ? 'application/pdf' : ext === 'png' ? 'image/png' : 'image/jpeg';
+      const patientName =
+        parts[2] && parts[2] !== 'undefined' && parts[2] !== '' ? parts[2] : undefined;
+      const recordDate =
+        parts[3] && parts[3] !== 'undefined' && parts[3] !== '' ? parts[3] : undefined;
+      return {
+        fileName,
+        mimeType,
+        uploadTimestamp: isNaN(timestamp) ? Date.now() : timestamp,
+        patientName,
+        recordDate,
+      };
+    }
+  } catch {
+    // fallback
+  }
+  const ext = fileId.split('.').pop()?.toLowerCase() ?? '';
+  const mimeType =
+    ext === 'pdf' ? 'application/pdf' : ext === 'png' ? 'image/png' : 'image/jpeg';
+  return { fileName: fileId, mimeType, uploadTimestamp: Date.now() };
+}
+
+export function useListUserFiles() {
+  const { actor, isFetching } = useActor();
+
+  return useQuery<FileRecord[]>({
+    queryKey: ['userFiles'],
+    queryFn: async () => {
+      if (!actor) return [];
+      const files = await actor.listUserFiles();
+      return files.map(([fileId, blob]) => ({
+        fileId,
+        blob,
+        ...parseFileId(fileId),
+      }));
+    },
+    enabled: !!actor && !isFetching,
+  });
+}
+
+export function useGetRecordDetails(recordId: string | null) {
+  const { actor, isFetching } = useActor();
+
+  return useQuery<ExternalBlob | null>({
+    queryKey: ['recordDetails', recordId],
+    queryFn: async () => {
+      if (!actor || !recordId) return null;
+      return actor.getRecordDetails(recordId);
+    },
+    enabled: !!actor && !isFetching && !!recordId,
+  });
+}
 
 export function useUploadFile() {
   const { actor } = useActor();
+  const queryClient = useQueryClient();
 
   return useMutation({
     mutationFn: async ({
-      bytes,
-      fileId,
-      isTemporary,
+      fileBytes,
+      fileName,
+      mimeType,
+      patientName,
+      recordDate,
+      onProgress,
     }: {
-      bytes: Uint8Array<ArrayBuffer>;
-      fileId: string;
-      isTemporary: boolean;
+      fileBytes: Uint8Array;
+      fileName: string;
+      mimeType: string;
+      patientName?: string;
+      recordDate?: string;
+      onProgress?: (pct: number) => void;
     }) => {
       if (!actor) throw new Error('Actor not available');
-      const blob = ExternalBlob.fromBytes(bytes);
-      return actor.uploadFileAndGetReference(blob, fileId, isTemporary);
+      const timestamp = Date.now();
+      const fileId = `${timestamp}__${fileName}__${patientName ?? ''}__${recordDate ?? ''}`;
+      // Cast to the exact type ExternalBlob.fromBytes expects
+      let blob = ExternalBlob.fromBytes(fileBytes as Uint8Array<ArrayBuffer>);
+      if (onProgress) {
+        blob = blob.withUploadProgress(onProgress);
+      }
+      return actor.uploadFileAndGetReference(blob, fileId, false);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['userFiles'] });
     },
   });
 }
 
 export function useDeleteUploadedFile() {
   const { actor } = useActor();
+  const queryClient = useQueryClient();
 
   return useMutation({
     mutationFn: async ({ fileId, isTemporary }: { fileId: string; isTemporary: boolean }) => {
       if (!actor) throw new Error('Actor not available');
       return actor.deleteUploadedFile(fileId, isTemporary);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['userFiles'] });
     },
   });
 }

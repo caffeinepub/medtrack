@@ -1,19 +1,33 @@
 import React from 'react';
-import { createRouter, createRoute, createRootRoute, Outlet, redirect } from '@tanstack/react-router';
-import { RouterProvider } from '@tanstack/react-router';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import {
+  createRouter,
+  createRoute,
+  createRootRoute,
+  RouterProvider,
+  Outlet,
+} from '@tanstack/react-router';
 import { ThemeProvider } from 'next-themes';
 import { Toaster } from '@/components/ui/sonner';
 import { Layout } from './components/Layout';
-import { LoginPage } from './pages/LoginPage';
 import { HomePage } from './pages/HomePage';
 import { AddRecordPage } from './pages/AddRecordPage';
 import { TimelinePage } from './pages/TimelinePage';
 import { AnalysisPage } from './pages/AnalysisPage';
+import { LoginPage } from './pages/LoginPage';
 import FamilyMembersPage from './pages/FamilyMembersPage';
+import RecordsPage from './pages/RecordsPage';
 import { useInternetIdentity } from './hooks/useInternetIdentity';
+import { redirect } from '@tanstack/react-router';
 
-const queryClient = new QueryClient();
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      staleTime: 1000 * 60 * 5,
+      retry: 1,
+    },
+  },
+});
 
 // Root route
 const rootRoute = createRootRoute({
@@ -73,6 +87,12 @@ const familyMembersRoute = createRoute({
   component: FamilyMembersPage,
 });
 
+const recordsRoute = createRoute({
+  getParentRoute: () => layoutRoute,
+  path: '/records',
+  component: RecordsPage,
+});
+
 const routeTree = rootRoute.addChildren([
   loginRoute,
   layoutRoute.addChildren([
@@ -81,6 +101,7 @@ const routeTree = rootRoute.addChildren([
     timelineRoute,
     analysisRoute,
     familyMembersRoute,
+    recordsRoute,
   ]),
 ]);
 

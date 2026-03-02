@@ -1,24 +1,136 @@
 {
   "kind": "implementation_plan",
   "version": "1.0",
-  "title": "Fix OCR date extraction from uploaded medical report documents",
+  "title": "Medical Records Management with PDF/Image Viewing, Search, and Private Access",
   "requirements": [
     {
-      "id": "REQ-19",
-      "summary": "Expand date extraction regex patterns in ocrExtraction.ts to reliably detect report dates from medical documents in multiple formats (DD/MM/YYYY, MM/DD/YYYY, YYYY-MM-DD, DD-MM-YYYY, DD MMM YYYY, MMM DD YYYY) and with common label prefixes (Date:, Report Date:, Collection Date:, Sample Date:, Test Date:, Date of Report:), returning a valid ISO date string (YYYY-MM-DD) that pre-populates the date field in UploadRecordForm",
+      "id": "REQ-1",
+      "summary": "Add a dedicated 'Records' page where authenticated users can see all their uploaded PDFs and images with thumbnails, file names, upload dates, and extracted metadata, ensuring each user only sees their own files",
       "acceptanceCriteria": [
-        "Uploading a medical report PDF or image with a date in any of the supported formats results in the date field being correctly pre-populated in the review form.",
-        "Dates prefixed with labels like 'Date:', 'Report Date:', 'Collection Date:', 'Sample Date:', 'Test Date:', or 'Date of Report:' are correctly parsed.",
-        "Unlabelled dates in common formats (DD/MM/YYYY, MM/DD/YYYY, YYYY-MM-DD, DD-MM-YYYY, DD MMM YYYY, MMM DD YYYY) are detected and returned.",
-        "The extracted date is converted to a valid ISO 8601 string (YYYY-MM-DD) before being set in the form state.",
-        "If no date is found, the date field remains empty (no crash or invalid value is set).",
-        "All previously passing OCR extraction tests for patient name and test categories continue to pass."
+        "A 'Records' page or section is accessible from the main navigation.",
+        "Only the authenticated user's own records are shown; no cross-user data leakage.",
+        "Each record shows its file name, file type (PDF or image), upload date, and any extracted metadata.",
+        "PDFs display a PDF icon; images display a thumbnail preview."
       ],
       "file_operations": [
         {
-          "path": "frontend/src/lib/ocrExtraction.ts",
+          "path": "frontend/src/pages/RecordsPage.tsx",
+          "operation": "create",
+          "description": "Create a new Records page component that fetches and displays the authenticated user's uploaded files. Use useListUserFiles hook to retrieve records scoped to the calling user's principal. Display each record with file type icon/thumbnail, file name, upload date, and extracted metadata fields (patient name, record date). Include loading states and empty state when no records exist."
+        },
+        {
+          "path": "frontend/src/hooks/useQueries.ts",
           "operation": "modify",
-          "description": "Expand the extractDate function regex patterns to match multiple common date formats including DD/MM/YYYY, MM/DD/YYYY, YYYY-MM-DD, DD-MM-YYYY, DD MMM YYYY (e.g., 12 Jan 2024), and MMM DD, YYYY (e.g., Jan 12, 2024). Add support for label-prefixed date formats such as 'Date:', 'Report Date:', 'Collection Date:', 'Sample Date:', 'Test Date:', and 'Date of Report:'. Implement robust date parsing logic that converts matched date strings to valid ISO 8601 format (YYYY-MM-DD), handling month name abbreviations and different separator characters. Ensure the function returns undefined if no valid date is found, and add validation to prevent invalid date values from being returned."
+          "description": "Add useListUserFiles React Query hook that calls actor.listUserFiles() to fetch all file records for the authenticated user. Return file ID, ExternalBlob reference, and metadata. Enable query only when actor is available and user is authenticated. Add useGetRecordDetails hook that calls actor.getRecordDetails(recordId) to fetch a specific file blob by ID."
+        },
+        {
+          "path": "frontend/src/components/RecordsList.tsx",
+          "operation": "create",
+          "description": "Create a RecordsList component that renders a grid or list of file record cards. For each record, display a file type badge (PDF/PNG/JPEG), thumbnail preview for images (using ExternalBlob.getDirectURL()), PDF icon for PDFs, file name, upload timestamp, and extracted metadata fields (patient name, record date if available). Include a click handler to open the viewer modal and a delete button for each record."
+        },
+        {
+          "path": "frontend/src/components/Navigation.tsx",
+          "operation": "modify",
+          "description": "Add a 'Records' navigation link in the authenticated user nav menu (desktop and mobile) that routes to the new RecordsPage. Place it between existing Timeline and Analysis links for logical flow."
+        },
+        {
+          "path": "frontend/src/App.tsx",
+          "operation": "modify",
+          "description": "Register a new protected route for '/records' that renders RecordsPage component. Ensure the route is wrapped in AuthGuard to require authentication before access."
+        }
+      ]
+    },
+    {
+      "id": "REQ-2",
+      "summary": "Enable in-app viewing of uploaded PDFs and images by clicking a record to open the file in a modal viewer, with PDFs rendered in an embedded viewer and images displayed in a lightbox",
+      "acceptanceCriteria": [
+        "Clicking a PDF record opens it in an embedded viewer inside the app without navigating away.",
+        "Clicking an image record opens it in a fullscreen lightbox modal.",
+        "The viewer/modal has a close button to return to the records list.",
+        "Files are served from stored blob data retrieved from the backend."
+      ],
+      "file_operations": [
+        {
+          "path": "frontend/src/components/FileViewerModal.tsx",
+          "operation": "create",
+          "description": "Create a modal component that accepts a file record (with ExternalBlob and MIME type) as props. For PDFs, render an iframe or object element with src set to ExternalBlob.getDirectURL() to display the PDF inline. For images (PNG/JPEG), render an img element in a lightbox-style modal with zoom and pan capabilities. Include a close button that dismisses the modal and returns focus to the records list. Handle loading states while the blob URL resolves."
+        },
+        {
+          "path": "frontend/src/components/RecordsList.tsx",
+          "operation": "modify",
+          "description": "Add click handlers to each record card that open the FileViewerModal with the selected record's blob and metadata. Pass the file ID to fetch the full blob via useGetRecordDetails if not already loaded. Manage modal open/close state and currently selected record."
+        }
+      ]
+    },
+    {
+      "id": "REQ-4",
+      "summary": "Add a delete action to each record in the Records page with confirmation prompt before permanently removing the file blob and metadata from the backend",
+      "acceptanceCriteria": [
+        "Each record entry in the Records page has a delete button.",
+        "Clicking delete shows a confirmation dialog before proceeding.",
+        "On confirmation, the record is removed from the backend and disappears from the list immediately.",
+        "A success or error toast notification is shown after the operation."
+      ],
+      "file_operations": [
+        {
+          "path": "frontend/src/hooks/useQueries.ts",
+          "operation": "modify",
+          "description": "Add useDeleteUploadedFile mutation hook that calls actor.deleteUploadedFile(fileId, isTemporary) to delete a file record. Invalidate the 'userFiles' query key on success to refresh the records list. Return mutation state for loading, error, and success handling."
+        },
+        {
+          "path": "frontend/src/components/RecordsList.tsx",
+          "operation": "modify",
+          "description": "Add a delete button (trash icon) to each record card. On click, show a confirmation dialog (using shadcn/ui AlertDialog component) asking the user to confirm deletion. On confirmation, call the useDeleteUploadedFile mutation with the record's file ID. Display a success toast notification on successful deletion and an error toast on failure. Disable the delete button while the mutation is in progress."
+        }
+      ]
+    },
+    {
+      "id": "REQ-5",
+      "summary": "Add search and filter controls to the Records page allowing users to search by file name or patient name and filter by date range, with results updating reactively",
+      "acceptanceCriteria": [
+        "A search input is present on the Records page and filters records by file name or extracted patient name in real time.",
+        "Date range pickers (from date, to date) allow filtering records by their upload or extracted record date.",
+        "Filtered results update without a page reload.",
+        "When no results match, an empty state message is displayed."
+      ],
+      "file_operations": [
+        {
+          "path": "frontend/src/components/RecordsFilters.tsx",
+          "operation": "create",
+          "description": "Create a RecordsFilters component that renders a search input for text-based filtering (file name or patient name) and two date pickers for from/to date range selection. Use shadcn/ui Input and DatePicker components. Expose filter state via props or context. Implement debounced search to avoid excessive re-renders while typing."
+        },
+        {
+          "path": "frontend/src/pages/RecordsPage.tsx",
+          "operation": "modify",
+          "description": "Add state management for search text and date range filters. Integrate the RecordsFilters component at the top of the page. Filter the records list client-side based on active filters (matching file name or extracted patient name against search text, and filtering upload/record date within the selected date range). Pass the filtered records array to RecordsList component. Display an empty state message when no records match the current filters."
+        }
+      ]
+    },
+    {
+      "id": "REQ-6",
+      "summary": "Automatically extract key information (record date, patient name) from uploaded PDFs and images using OCR extraction, display extracted fields in a review step, and allow editing before saving",
+      "acceptanceCriteria": [
+        "After a file is selected for upload, OCR extraction is run on the decoded file content.",
+        "Extracted date and patient name fields are shown in a review step before saving.",
+        "The user can edit extracted values before confirming the upload.",
+        "Extracted metadata is stored alongside the file blob in the backend.",
+        "If extraction fails or yields no results, the fields are left blank and the user is prompted to fill them in manually."
+      ],
+      "file_operations": [
+        {
+          "path": "frontend/src/components/FileUploadWithExtraction.tsx",
+          "operation": "create",
+          "description": "Create a new file upload component that extends FileUploadZone with OCR extraction. After a file is selected, decode the file bytes and pass them to the ocrExtraction utility (frontend/src/lib/ocrExtraction.ts) to extract record date and patient name. Display a review form showing the extracted fields (pre-filled if extraction succeeded, blank if not) with editable inputs for the user to correct or fill in. Include a submit button that calls the backend upload function (actor.uploadFileAndGetReference) with the ExternalBlob and extracted metadata. Show loading state during extraction and upload. Reuse existing FileUploadZone validation (PDF/PNG/JPEG, 5MB limit)."
+        },
+        {
+          "path": "frontend/src/pages/RecordsPage.tsx",
+          "operation": "modify",
+          "description": "Add an 'Upload New File' button or section at the top of the RecordsPage that opens a modal or inline form containing the FileUploadWithExtraction component. On successful upload, invalidate the userFiles query to refresh the records list and show a success toast notification."
+        },
+        {
+          "path": "frontend/src/hooks/useQueries.ts",
+          "operation": "modify",
+          "description": "Add useUploadFile mutation hook that calls actor.uploadFileAndGetReference(blob, fileId, isTemporary) to upload a file with extracted metadata. Include upload progress tracking using ExternalBlob.withUploadProgress() to display progress percentage during upload. Invalidate 'userFiles' query on success."
         }
       ]
     }

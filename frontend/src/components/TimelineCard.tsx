@@ -30,7 +30,15 @@ export function TimelineCard({ record, familyMemberId }: TimelineCardProps) {
 
   const recordDate = new Date(Number(record.recordDate));
 
-  const dataEntries = Object.entries(record.data as Record<string, string>).filter(
+  // Parse data from JSON string
+  let dataObj: Record<string, string> = {};
+  try {
+    dataObj = JSON.parse(record.data) as Record<string, string>;
+  } catch {
+    dataObj = { notes: record.data };
+  }
+
+  const dataEntries = Object.entries(dataObj).filter(
     ([, v]) => v !== '' && v !== undefined && v !== null
   );
 
@@ -81,22 +89,33 @@ export function TimelineCard({ record, familyMemberId }: TimelineCardProps) {
               {dataEntries.map(([key, value]) => {
                 const range = REFERENCE_RANGES[key];
                 const numVal = parseFloat(value);
-                const inRange = range && !isNaN(numVal)
-                  ? numVal >= range.min && numVal <= range.max
-                  : null;
+                const inRange =
+                  range && !isNaN(numVal)
+                    ? numVal >= range.min && numVal <= range.max
+                    : null;
                 const label = range?.label ?? key;
                 return (
                   <div key={key} className="bg-muted/40 rounded-md p-2">
                     <p className="text-xs text-muted-foreground">{label}</p>
                     <div className="flex items-center gap-1">
                       <p className="text-sm font-medium">{value}</p>
-                      {range && <span className="text-xs text-muted-foreground">{range.unit}</span>}
                       {inRange !== null && (
-                        <span className={`text-xs ml-auto ${inRange ? 'text-success' : 'text-destructive'}`}>
+                        <span
+                          className={`text-[10px] font-medium px-1 rounded ${
+                            inRange
+                              ? 'text-success bg-success/10'
+                              : 'text-destructive bg-destructive/10'
+                          }`}
+                        >
                           {inRange ? '✓' : '!'}
                         </span>
                       )}
                     </div>
+                    {range && (
+                      <p className="text-[10px] text-muted-foreground mt-0.5">
+                        {range.min}–{range.max} {range.unit}
+                      </p>
+                    )}
                   </div>
                 );
               })}

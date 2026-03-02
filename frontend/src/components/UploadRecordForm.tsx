@@ -9,7 +9,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { FileUploadZone } from './FileUploadZone';
 import { CategoryFieldSet } from './CategoryFieldSet';
-import { extractFromFile } from '../lib/ocrExtraction';
+import { extractFromText } from '../lib/ocrExtraction';
 import type { ExtractedTestData, ExtractedRecordEntry } from '../types/fileUpload';
 import { useUploadFile, useAddMedicalRecord, useListFamilyMembers, useCreateFamilyMember } from '../hooks/useQueries';
 import { RecordType } from '../backend';
@@ -51,8 +51,11 @@ export function UploadRecordForm() {
 
     try {
       const arrayBuffer: ArrayBuffer = await file.arrayBuffer();
-      const bytes = new Uint8Array(arrayBuffer) as Uint8Array<ArrayBuffer>;
-      const result = await extractFromFile(bytes);
+      const bytes = new Uint8Array(arrayBuffer);
+      // Extract text from bytes and run OCR
+      const decoder = new TextDecoder('utf-8', { fatal: false });
+      const text = decoder.decode(bytes);
+      const result = extractFromText(text);
       setExtractedData(result);
 
       const reviews: ReviewRecord[] = result.records.map((r) => ({
@@ -135,9 +138,14 @@ export function UploadRecordForm() {
     try {
       // Upload file
       const arrayBuffer: ArrayBuffer = await selectedFile.arrayBuffer();
-      const bytes = new Uint8Array(arrayBuffer) as Uint8Array<ArrayBuffer>;
-      const fileId = `upload_${Date.now()}_${Math.random().toString(36).slice(2)}`;
-      await uploadFile.mutateAsync({ bytes, fileId, isTemporary: false });
+      const fileBytes = new Uint8Array(arrayBuffer);
+      await uploadFile.mutateAsync({
+        fileBytes,
+        fileName: selectedFile.name,
+        mimeType: selectedFile.type,
+        patientName: extractedData?.patientName ?? undefined,
+        recordDate: reviewRecords[0]?.editedDate ?? undefined,
+      });
 
       // Save each extracted record
       let savedCount = 0;
@@ -183,7 +191,7 @@ export function UploadRecordForm() {
     <div className="space-y-6">
       {/* Upload zone */}
       <FileUploadZone
-        onFileSelected={handleFileSelected}
+        onFileSelect={handleFileSelected}
         disabled={isExtracting || isSaving}
         selectedFile={selectedFile}
         onClear={handleClearFile}
@@ -313,11 +321,7 @@ export function UploadRecordForm() {
 
           {/* Submit */}
           {reviewRecords.length > 0 && (
-            <Button
-              onClick={handleSubmit}
-              disabled={!canSubmit}
-              className="w-full"
-            >
+            <Button onClick={handleSubmit} disabled={!canSubmit} className="w-full">
               {isSaving ? (
                 <>
                   <Loader2 className="h-4 w-4 animate-spin mr-2" />

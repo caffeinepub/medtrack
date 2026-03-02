@@ -1,40 +1,145 @@
 {
   "kind": "build_request",
-  "title": "Fix OCR date extraction from uploaded medical report documents",
-  "projectName": "MediTrack",
-  "priority": "high",
+  "title": "Medical Records Management with PDF/Image Viewing, Search, and Private Access",
+  "projectName": "MediTrack Records",
+  "priority": "normal",
   "requirements": [
     {
-      "id": "REQ-19",
-      "text": "Fix the date extraction logic in `frontend/src/lib/ocrExtraction.ts` so that the report date is reliably detected from uploaded medical report documents. Expand the regex patterns to cover common date formats found in medical reports, including but not limited to: 'DD/MM/YYYY', 'MM/DD/YYYY', 'YYYY-MM-DD', 'DD-MM-YYYY', 'DD MMM YYYY' (e.g., '12 Jan 2024'), 'MMM DD, YYYY' (e.g., 'Jan 12, 2024'), and label-prefixed formats such as 'Date:', 'Report Date:', 'Collection Date:', 'Sample Date:', 'Test Date:', and 'Date of Report:'. The extracted date must be returned as a valid ISO date string (YYYY-MM-DD) in the `ExtractedTestData` result and pre-populated in the date field of each extracted record displayed in the `UploadRecordForm` component.",
-      "target": "frontend",
+      "id": "REQ-1",
+      "text": "Add a dedicated 'Records' section/page where authenticated users can see all their uploaded PDFs and images. Each record entry should display a thumbnail or file-type icon, the file name, upload date, and extracted metadata (e.g., patient name, record date). The list must be private — each user only sees their own files.",
+      "target": "both",
       "source": {
         "messageIds": [
-          "msg-1"
+          "msg-1",
+          "msg-2"
         ],
         "quotes": [
-          "date isnt picked from the document"
+          "access to records should be a feature where all pdf/image could be seen",
+          "yes its private"
         ]
       },
       "acceptanceCriteria": [
-        "Uploading a medical report PDF or image with a date in any of the supported formats results in the date field being correctly pre-populated in the review form.",
-        "Dates prefixed with labels like 'Date:', 'Report Date:', 'Collection Date:', 'Sample Date:', 'Test Date:', or 'Date of Report:' are correctly parsed.",
-        "Unlabelled dates in common formats (DD/MM/YYYY, MM/DD/YYYY, YYYY-MM-DD, DD-MM-YYYY, DD MMM YYYY, MMM DD YYYY) are detected and returned.",
-        "The extracted date is converted to a valid ISO 8601 string (YYYY-MM-DD) before being set in the form state.",
-        "If no date is found, the date field remains empty (no crash or invalid value is set).",
-        "All previously passing OCR extraction tests for patient name and test categories continue to pass."
+        "A 'Records' page or section is accessible from the main navigation.",
+        "Only the authenticated user's own records are shown; no cross-user data leakage.",
+        "Each record shows its file name, file type (PDF or image), upload date, and any extracted metadata.",
+        "PDFs display a PDF icon; images display a thumbnail preview."
+      ]
+    },
+    {
+      "id": "REQ-2",
+      "text": "Enable in-app viewing of uploaded PDFs and images. Clicking a record should open the file in a modal or dedicated viewer — PDFs rendered in an embedded PDF viewer (e.g., using an iframe or object tag with the blob URL) and images displayed in a lightbox-style modal.",
+      "target": "frontend",
+      "source": {
+        "messageIds": [
+          "msg-1",
+          "msg-2"
+        ],
+        "quotes": [
+          "all pdf/image could be seen",
+          "View Records: Browse and open uploaded PDFs and images in-app"
+        ]
+      },
+      "acceptanceCriteria": [
+        "Clicking a PDF record opens it in an embedded viewer inside the app without navigating away.",
+        "Clicking an image record opens it in a fullscreen lightbox modal.",
+        "The viewer/modal has a close button to return to the records list.",
+        "Files are served from stored blob data retrieved from the backend."
+      ]
+    },
+    {
+      "id": "REQ-3",
+      "text": "Store uploaded PDF and image file blobs in the backend per user. Each stored record should track: the file blob (Blob), MIME type, original file name, upload timestamp, and the user's principal as the owner. Retrieval must be scoped to the calling user's principal.",
+      "target": "backend",
+      "source": {
+        "messageIds": [
+          "msg-1",
+          "msg-2"
+        ],
+        "quotes": [
+          "Upload & Store: Upload PDFs and images",
+          "Private Access: Each user only sees their own records (secured via Internet Identity)"
+        ]
+      },
+      "acceptanceCriteria": [
+        "Backend exposes a function to upload a file blob with metadata (name, MIME type).",
+        "Backend exposes a function to list all file records for the calling user.",
+        "Backend exposes a function to retrieve a specific file blob by ID, only if it belongs to the calling user.",
+        "Backend exposes a function to delete a specific file record by ID, only if it belongs to the calling user.",
+        "Unauthorized access attempts to another user's records return an error."
+      ]
+    },
+    {
+      "id": "REQ-4",
+      "text": "Add a delete action to each record in the Records page. A delete button on each record entry should prompt for confirmation before permanently removing both the file blob and its metadata from the backend.",
+      "target": "both",
+      "source": {
+        "messageIds": [
+          "msg-2"
+        ],
+        "quotes": [
+          "Delete Records: Remove individual records"
+        ]
+      },
+      "acceptanceCriteria": [
+        "Each record entry in the Records page has a delete button.",
+        "Clicking delete shows a confirmation dialog before proceeding.",
+        "On confirmation, the record is removed from the backend and disappears from the list immediately.",
+        "A success or error toast notification is shown after the operation."
+      ]
+    },
+    {
+      "id": "REQ-5",
+      "text": "Add search and filter controls to the Records page. Users should be able to search records by file name or extracted patient name, and filter by date range (from/to date pickers). Results should update reactively as the user types or changes filters.",
+      "target": "frontend",
+      "source": {
+        "messageIds": [
+          "msg-2"
+        ],
+        "quotes": [
+          "Search & Filter: Search by name and filter by date"
+        ]
+      },
+      "acceptanceCriteria": [
+        "A search input is present on the Records page and filters records by file name or extracted patient name in real time.",
+        "Date range pickers (from date, to date) allow filtering records by their upload or extracted record date.",
+        "Filtered results update without a page reload.",
+        "When no results match, an empty state message is displayed."
+      ]
+    },
+    {
+      "id": "REQ-6",
+      "text": "Automatically extract key information from uploaded PDFs and images upon upload. At minimum, attempt to extract: record date and patient name using the existing OCR extraction utility (ocrExtraction.ts). Display extracted fields alongside the file in the Records list and allow the user to review/edit them before saving.",
+      "target": "frontend",
+      "source": {
+        "messageIds": [
+          "msg-2"
+        ],
+        "quotes": [
+          "Auto Data Extraction: Automatically extract key info (e.g., date, patient name) from uploaded documents"
+        ]
+      },
+      "acceptanceCriteria": [
+        "After a file is selected for upload, OCR extraction is run on the decoded file content.",
+        "Extracted date and patient name fields are shown in a review step before saving.",
+        "The user can edit extracted values before confirming the upload.",
+        "Extracted metadata is stored alongside the file blob in the backend.",
+        "If extraction fails or yields no results, the fields are left blank and the user is prompted to fill them in manually."
       ]
     }
   ],
   "constraints": [
-    "Do not modify any file under frontend/src/hooks/ (immutable paths).",
-    "Do not modify frontend/src/components/ui/ (immutable paths).",
-    "Changes must be limited to the OCR extraction utility and, if necessary, the UploadRecordForm component for wiring the date field."
+    "All records must remain private per user — backend must scope all file reads and deletes to the calling user's principal.",
+    "Authentication must use Internet Identity only.",
+    "Do not modify files under frontend/src/hooks/useInternetIdentity.ts, frontend/src/hooks/useActor.ts, frontend/src/main.tsx, or frontend/src/components/ui.",
+    "File uploads are limited to PDFs, PNGs, and JPEGs up to 5MB (consistent with existing FileUploadZone component).",
+    "Reuse the existing OCR extraction utility at frontend/src/lib/ocrExtraction.ts for auto data extraction."
   ],
   "nonGoals": [
-    "Adding backend OCR processing — extraction remains client-side.",
-    "Changing the date storage format in the backend data model.",
-    "Altering any other OCR extraction fields (patient name, test categories, metric values)."
+    "Shared or admin-accessible record repositories — all records are strictly private.",
+    "Support for file types other than PDF, PNG, and JPEG.",
+    "External cloud storage — all blobs are stored in the Motoko backend.",
+    "Real-time collaboration or multi-user record sharing.",
+    "Email or push notification features."
   ],
   "imageRequirements": {
     "required": [],

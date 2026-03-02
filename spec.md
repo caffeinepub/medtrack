@@ -1,13 +1,14 @@
 # Specification
 
 ## Summary
-**Goal:** Fix OCR date extraction in MediTrack so that report dates are reliably detected from uploaded medical documents and pre-populated in the upload form.
+**Goal:** Add a private Records section to MediTrack where authenticated users can upload, view, search, filter, and delete their own PDF and image medical records, with automatic metadata extraction on upload.
 
 **Planned changes:**
-- Expand regex patterns in `frontend/src/lib/ocrExtraction.ts` to support common date formats: `DD/MM/YYYY`, `MM/DD/YYYY`, `YYYY-MM-DD`, `DD-MM-YYYY`, `DD MMM YYYY`, and `MMM DD, YYYY`
-- Add support for label-prefixed date detection: `Date:`, `Report Date:`, `Collection Date:`, `Sample Date:`, `Test Date:`, and `Date of Report:`
-- Convert all extracted dates to ISO 8601 format (`YYYY-MM-DD`) in the `ExtractedTestData` result
-- Wire the extracted date into the date field of the `UploadRecordForm` component so it is pre-populated on review
-- If no date is found, leave the date field empty without errors
+- Add a backend store for file blobs (PDF/PNG/JPEG) per user, tracking file name, MIME type, upload timestamp, extracted metadata, and owner principal; expose upload, list, retrieve, and delete functions scoped to the calling user
+- Add a "Records" page accessible from main navigation showing only the authenticated user's own records, each displaying a file-type icon or image thumbnail, file name, upload date, and extracted metadata
+- On file selection, run OCR extraction (using existing `ocrExtraction.ts`) to pull record date and patient name, show a review/edit step before saving, and store extracted metadata alongside the blob
+- Enable in-app viewing: PDFs open in an embedded viewer (iframe/object), images open in a fullscreen lightbox modal, both with a close button
+- Add a delete button per record that shows a confirmation dialog before removing the record from the backend, with success/error toast feedback
+- Add a search input (filters by file name or extracted patient name in real time) and date range pickers (from/to) to the Records page; show an empty state when no results match
 
-**User-visible outcome:** When a user uploads a medical report PDF or image, the report date is automatically detected and pre-filled in the review form, regardless of the date format used in the document.
+**User-visible outcome:** After logging in, users can upload PDFs and images, have key info auto-extracted, browse their private records list with search and date filtering, open any file in-app, and delete records — with no access to other users' data.

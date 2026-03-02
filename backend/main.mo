@@ -9,9 +9,8 @@ import Runtime "mo:core/Runtime";
 import MixinAuthorization "authorization/MixinAuthorization";
 import AccessControl "authorization/access-control";
 import Storage "blob-storage/Storage";
+import Iter "mo:core/Iter";
 import MixinStorage "blob-storage/Mixin";
-
-
 
 actor {
   let accessControlState = AccessControl.initState();
@@ -66,6 +65,15 @@ actor {
   let temporaryFiles = Map.empty<Principal, Map.Map<Text, Storage.ExternalBlob>>();
   let uploadedFiles = Map.empty<Text, Storage.ExternalBlob>();
   let familyMembers = Map.empty<Principal, Map.Map<Text, FamilyMemberProfile>>();
+  let userFiles = Map.empty<Principal, Map.Map<Text, Storage.ExternalBlob>>();
+
+  public type RecordMetadata = {
+    fileName : Text;
+    uploadTimestamp : Int;
+    owner : Principal;
+  };
+
+  let recordMetadata = Map.empty<Text, RecordMetadata>();
 
   func getAllRecordsForUser(caller : Principal) : AllRecords {
     let empty : AllRecords = {
@@ -137,7 +145,6 @@ actor {
 
   public query ({ caller }) func listFamilyMembers() : async [FamilyMemberProfile] {
     requireUser(caller);
-
     switch (familyMembers.get(caller)) {
       case (null) { [] };
       case (?profiles) { profiles.values().toArray() };
@@ -388,8 +395,13 @@ actor {
     };
 
     // Add permanent files
-    for ((fileId, blob) in uploadedFiles.entries()) {
-      files.add(fileId, blob);
+    switch (userFiles.get(caller)) {
+      case (?permFiles) {
+        for ((fileId, blob) in permFiles.entries()) {
+          files.add(fileId, blob);
+        };
+      };
+      case (null) {};
     };
 
     files.toArray();
@@ -402,6 +414,9 @@ actor {
       case (true) {
         switch (temporaryFiles.get(caller)) {
           case (?tempFiles) {
+            if (not tempFiles.containsKey(fileId)) {
+              Runtime.trap("Temporary file not found");
+            };
             tempFiles.remove(fileId);
             if (tempFiles.isEmpty()) {
               temporaryFiles.remove(caller);
@@ -411,7 +426,18 @@ actor {
         };
       };
       case (false) {
-        uploadedFiles.remove(fileId);
+        switch (userFiles.get(caller)) {
+          case (null) { Runtime.trap("File not found") };
+          case (?files) {
+            if (not files.containsKey(fileId)) {
+              Runtime.trap("File not found or not owned by caller");
+            };
+            files.remove(fileId);
+            if (files.isEmpty()) {
+              userFiles.remove(caller);
+            };
+          };
+        };
       };
     };
   };
@@ -436,9 +462,73 @@ actor {
       temporaryFiles.add(caller, newTempFileMap);
     } else {
       // Add permanent file
-      uploadedFiles.add(fileId, blob);
+      let userSpecificFiles = switch (userFiles.get(caller)) {
+        case (null) {
+          let map = Map.empty<Text, Storage.ExternalBlob>();
+          map.add(fileId, blob);
+          map;
+        };
+        case (?existing) {
+          existing.add(fileId, blob);
+          existing;
+        };
+      };
+
+      userFiles.add(caller, userSpecificFiles);
+
+      // Store metadata
+      let meta : RecordMetadata = {
+        fileName = fileId;
+        uploadTimestamp = 0; // replace with actual timestamp
+        owner = caller;
+      };
+      recordMetadata.add(fileId, meta);
     };
 
     fileId;
+  };
+
+  public query ({ caller }) func listUserFiles() : async [(Text, Storage.ExternalBlob)] {
+    requireUser(caller);
+    switch (userFiles.get(caller)) {
+      case (null) { [] };
+      case (?files) { files.toArray() };
+    };
+  };
+
+  public query ({ caller }) func getRecordDetails(recordId : Text) : async ?Storage.ExternalBlob {
+    requireUser(caller);
+
+    switch (userFiles.get(caller)) {
+      case (null) { return null };
+      case (?files) { return files.get(recordId) };
+    };
+  };
+
+  public shared ({ caller }) func deleteRecord(recordId : Text) : async () {
+    requireUser(caller);
+
+    switch (userFiles.get(caller)) {
+      case (null) { Runtime.trap("No files found for user") };
+      case (?files) {
+        if (not files.containsKey(recordId)) {
+          Runtime.trap("File not found or not owned by caller");
+        };
+        files.remove(recordId);
+        if (files.isEmpty()) {
+          userFiles.remove(caller);
+        } else {
+          userFiles.add(caller, files);
+        };
+      };
+    };
+  };
+
+  public query ({ caller }) func getUserRecords() : async [(Text, Storage.ExternalBlob)] {
+    requireUser(caller);
+    switch (userFiles.get(caller)) {
+      case (null) { [] };
+      case (?files) { files.toArray() };
+    };
   };
 };

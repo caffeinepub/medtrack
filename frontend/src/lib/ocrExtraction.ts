@@ -1,4 +1,4 @@
-import { ExtractedTestData, ExtractedRecordEntry } from '../types/fileUpload';
+import type { ExtractedTestData, ExtractedRecordEntry } from '../types/fileUpload';
 
 // ── helpers ──────────────────────────────────────────────────────────────────
 
@@ -65,18 +65,14 @@ function parseRawDate(raw: string): string | null {
   return null;
 }
 
-function extractDate(text: string): string | null {
+export function extractDate(text: string): string | null {
   const DATE_LABEL = /(?:date\s*of\s*report|report\s*date|collection\s*date|sample\s*date|test\s*date|date)\s*[:\-]\s*/i;
 
   // Labeled patterns — try these first for higher confidence
   const labeledPatterns: RegExp[] = [
-    // Label + YYYY-MM-DD / YYYY/MM/DD
     new RegExp(DATE_LABEL.source + '(\\d{4}[\\\/\\-\\.]\\d{1,2}[\\\/\\-\\.]\\d{1,2})', 'i'),
-    // Label + DD/MM/YYYY or DD-MM-YYYY
     new RegExp(DATE_LABEL.source + '(\\d{1,2}[\\\/\\-\\.]\\d{1,2}[\\\/\\-\\.]\\d{2,4})', 'i'),
-    // Label + DD MMM YYYY
     new RegExp(DATE_LABEL.source + '(\\d{1,2}\\s+[A-Za-z]+\\s+\\d{4})', 'i'),
-    // Label + MMM DD, YYYY
     new RegExp(DATE_LABEL.source + '([A-Za-z]+\\s+\\d{1,2},?\\s+\\d{4})', 'i'),
   ];
 
@@ -90,13 +86,9 @@ function extractDate(text: string): string | null {
 
   // Unlabeled patterns — scan the whole text
   const unlabeledPatterns: RegExp[] = [
-    // YYYY-MM-DD (ISO)
     /\b(\d{4}[\-\/\.]\d{1,2}[\-\/\.]\d{1,2})\b/,
-    // DD MMM YYYY (e.g., 12 Jan 2024)
     /\b(\d{1,2}\s+(?:jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]*\s+\d{4})\b/i,
-    // MMM DD, YYYY (e.g., Jan 12, 2024)
     /\b((?:jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]*\s+\d{1,2},?\s+\d{4})\b/i,
-    // DD/MM/YYYY or DD-MM-YYYY
     /\b(\d{1,2}[\/\-\.]\d{1,2}[\/\-\.]\d{4})\b/,
   ];
 
@@ -111,7 +103,7 @@ function extractDate(text: string): string | null {
   return null;
 }
 
-function extractPatientName(text: string): string | null {
+export function extractPatientName(text: string): string | null {
   const patterns = [
     /patient\s*name\s*[:\-]\s*([A-Za-z][A-Za-z\s\.\-]{1,50})/i,
     /patient\s*[:\-]\s*([A-Za-z][A-Za-z\s\.\-]{1,50})/i,
@@ -124,7 +116,6 @@ function extractPatientName(text: string): string | null {
     const match = text.match(pattern);
     if (match && match[1]) {
       const name = match[1].trim().replace(/\s+/g, ' ');
-      // Filter out common false positives
       const lower = name.toLowerCase();
       if (
         lower.includes('report') ||
@@ -260,7 +251,6 @@ function extractBloodSugar(text: string): Record<string, string> | null {
     }
   }
 
-  // Also check for generic glucose
   if (found === 0) {
     const glucoseMatch = text.match(/glucose[^0-9]*([0-9]+\.?[0-9]*)/i);
     if (glucoseMatch) {
@@ -277,7 +267,6 @@ function extractBloodSugar(text: string): Record<string, string> | null {
 function extractBloodPressure(text: string): Record<string, string> | null {
   const fields: Record<string, string> = {};
 
-  // Pattern: 120/80 or systolic/diastolic
   const bpPattern = text.match(/(?:bp|blood\s*pressure)[^0-9]*([0-9]+)\s*[\/\-]\s*([0-9]+)/i);
   if (bpPattern) {
     fields['systolic'] = bpPattern[1];
@@ -328,7 +317,6 @@ export function extractFromText(text: string): ExtractedTestData {
     records.push({ category: 'BloodPressure', metricFields: bpFields, date });
   }
 
-  // If nothing detected, create a GeneralAilments entry
   if (records.length === 0) {
     records.push({
       category: 'GeneralAilments',
@@ -343,4 +331,9 @@ export function extractFromText(text: string): ExtractedTestData {
 export async function extractFromFile(bytes: Uint8Array): Promise<ExtractedTestData> {
   const text = extractText(bytes);
   return extractFromText(text);
+}
+
+// Alias for FileUploadWithExtraction component
+export async function extractMedicalData(bytes: Uint8Array, _mimeType: string): Promise<ExtractedTestData> {
+  return extractFromFile(bytes);
 }

@@ -1,24 +1,55 @@
 {
   "kind": "spec_vs_diff_report",
   "version": "1.0",
-  "generatedAt": "2026-02-24T17:59:05.415Z",
-  "summary": "The diff modifies `frontend/src/lib/ocrExtraction.ts` to implement expanded date extraction logic with labeled and unlabeled patterns, a MONTH_MAP, parseRawDate helper, and toISO conversion. The file is truncated but shows substantial implementation of REQ-19's core extraction logic. The UploadRecordForm wiring is mentioned in the frontend-file-summaries.txt but no explicit diff of that component is provided to confirm pre-population changes. The project_state.json and frontend-file-summaries.txt are updated as metadata. Overall, the OCR extraction logic appears implemented, but the UploadRecordForm date field pre-population cannot be fully confirmed from the diff.",
+  "generatedAt": "2026-03-02T18:03:36.988Z",
+  "summary": "The diff implements all six requirements with substantial coverage. Frontend pages, components, hooks, navigation, and backend storage logic are all present. However, there are concerns about the backend implementation completeness and the file viewer using a non-standard blob.getDirectURL() method that may not correctly serve files retrieved from the backend blob store.",
   "missing_requirements": [
     {
-      "id": "REQ-19",
-      "requirement": "The extracted date must be pre-populated in the date field of each extracted record displayed in the UploadRecordForm component.",
-      "reason": "The diff does not include any changes to the UploadRecordForm component. The ocrExtraction.ts changes appear to implement date extraction, but there is no evidence in the diff that UploadRecordForm was updated to wire the extracted date into the form state for pre-population.",
+      "id": "REQ-3",
+      "requirement": "Backend exposes a function to retrieve a specific file blob by ID, only if it belongs to the calling user. Unauthorized access attempts to another user's records return an error.",
+      "reason": "The backend/main.mo diff is truncated and shows userFiles and recordMetadata maps defined, but the actual canister query/update functions for retrieving a file blob by ID with principal-scoped authorization checks are not visible in the truncated diff. The constraint that unauthorized access returns an error cannot be confirmed as implemented.",
       "evidence": [
-        "frontend/src/lib/ocrExtraction.ts",
-        "frontend-file-summaries.txt"
+        "backend/main.mo"
+      ]
+    },
+    {
+      "id": "REQ-2",
+      "requirement": "Files are served from stored blob data retrieved from the backend.",
+      "reason": "FileViewerModal.tsx uses record.blob.getDirectURL() to construct a URL for rendering PDFs in an iframe and images in an img tag. This method does not appear to be a standard Web API — it is unclear how the blob retrieved from the ICP backend (likely a Uint8Array) is converted to a usable object URL. There is no visible URL.createObjectURL() or Blob construction from the backend bytes, raising doubt that files are correctly served from the stored backend blob data.",
+      "evidence": [
+        "frontend/src/components/FileViewerModal.tsx",
+        "frontend/src/components/RecordsList.tsx"
       ]
     }
   ],
-  "hallucinated_features": [],
-  "confidence": 0.65,
+  "hallucinated_features": [
+    {
+      "description": "Download button in the FileViewerModal",
+      "reason": "The BuildRequest does not mention a download feature for records. FileViewerModal.tsx includes a Download button with an anchor tag pointing to the file URL.",
+      "evidence": [
+        "frontend/src/components/FileViewerModal.tsx"
+      ]
+    }
+  ],
+  "confidence": 0.72,
   "changed_files": [
+    "backend/main.mo",
     "frontend-file-summaries.txt",
+    "frontend/src/App.tsx",
+    "frontend/src/components/AnalysisDashboard.tsx",
+    "frontend/src/components/DashboardSidebar.tsx",
+    "frontend/src/components/FileUploadWithExtraction.tsx",
+    "frontend/src/components/FileUploadZone.tsx",
+    "frontend/src/components/FileViewerModal.tsx",
+    "frontend/src/components/MedicalRecordForm.tsx",
+    "frontend/src/components/Navigation.tsx",
+    "frontend/src/components/RecordsFilters.tsx",
+    "frontend/src/components/RecordsList.tsx",
+    "frontend/src/components/TimelineCard.tsx",
+    "frontend/src/components/UploadRecordForm.tsx",
+    "frontend/src/hooks/useQueries.ts",
     "frontend/src/lib/ocrExtraction.ts",
+    "frontend/src/pages/RecordsPage.tsx",
     "project_state.json"
   ]
 }
