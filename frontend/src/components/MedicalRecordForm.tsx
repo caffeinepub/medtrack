@@ -3,7 +3,7 @@ import { toast } from 'sonner';
 import { RecordType, RECORD_TYPE_LABELS } from '../types/medicalRecords';
 import type { RecordData } from '../types/medicalRecords';
 import { CategoryFieldSet } from './CategoryFieldSet';
-import { useAddMedicalRecord } from '../hooks/useQueries';
+import { useAddMedicalRecord, useListFamilyMembers } from '../hooks/useQueries';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
@@ -38,8 +38,10 @@ export function MedicalRecordForm() {
   const [date, setDate] = useState(getTodayString());
   const [fieldValues, setFieldValues] = useState<Record<string, string>>({});
   const [errors, setErrors] = useState<Record<string, string>>({});
+  const [familyMemberId, setFamilyMemberId] = useState<string>('__personal__');
 
   const addRecord = useAddMedicalRecord();
+  const { data: familyMembers = [] } = useListFamilyMembers();
 
   function handleFieldChange(key: string, value: string) {
     setFieldValues((prev) => ({ ...prev, [key]: value }));
@@ -73,7 +75,6 @@ export function MedicalRecordForm() {
         newErrors.severity = 'Severity is required';
       }
     } else {
-      // At least one numeric field must be filled
       const hasAnyValue = Object.values(fieldValues).some((v) => v.trim() !== '');
       if (!hasAnyValue) {
         newErrors._general = 'Please fill in at least one field';
@@ -89,16 +90,24 @@ export function MedicalRecordForm() {
     if (!validate()) return;
 
     const recordDate = BigInt(new Date(date).getTime());
+    const memberId = familyMemberId === '__personal__' ? null : familyMemberId;
 
     try {
       await addRecord.mutateAsync({
         recordId: generateId(),
         recordDate,
         recordType: category,
-        data: fieldValues as unknown as RecordData,
+        data: JSON.stringify(fieldValues as unknown as RecordData),
+        familyMemberId: memberId,
       });
+
+      const memberName =
+        memberId === null
+          ? 'My Records'
+          : familyMembers.find((m) => m.profileId === memberId)?.name ?? 'Family Member';
+
       toast.success('Record saved successfully!', {
-        description: `${RECORD_TYPE_LABELS[category]} record for ${new Date(date).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })} has been added.`,
+        description: `${RECORD_TYPE_LABELS[category]} record added to ${memberName}.`,
       });
       setFieldValues({});
       setDate(getTodayString());
@@ -112,6 +121,26 @@ export function MedicalRecordForm() {
 
   return (
     <form onSubmit={handleSubmit} className="space-y-6">
+      {/* Family member selector */}
+      <div className="space-y-1.5">
+        <Label htmlFor="family-member" className="text-sm font-medium">
+          Add to Profile
+        </Label>
+        <Select value={familyMemberId} onValueChange={setFamilyMemberId}>
+          <SelectTrigger id="family-member">
+            <SelectValue placeholder="Select profile" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="__personal__">My Records (Personal)</SelectItem>
+            {familyMembers.map((m) => (
+              <SelectItem key={m.profileId} value={m.profileId}>
+                {m.name}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </div>
+
       {/* Category & Date row */}
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         <div className="space-y-1.5">
@@ -185,7 +214,7 @@ export function MedicalRecordForm() {
           {addRecord.isPending ? (
             <>
               <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-              Saving...
+              Saving…
             </>
           ) : (
             <>

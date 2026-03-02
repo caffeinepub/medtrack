@@ -1,398 +1,334 @@
 import { useState, useCallback } from 'react';
 import { toast } from 'sonner';
+import { FileText, CheckCircle, AlertCircle, Loader2, Plus, User } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Badge } from '@/components/ui/badge';
 import { FileUploadZone } from './FileUploadZone';
 import { CategoryFieldSet } from './CategoryFieldSet';
-import { useAddMedicalRecord, useUploadFile } from '../hooks/useQueries';
-import { RecordType, RECORD_TYPE_LABELS } from '../types/medicalRecords';
-import type { RecordData } from '../types/medicalRecords';
-import type { ExtractedRecordData, UploadStatus } from '../types/fileUpload';
-import { extractRecordData } from '../lib/ocrExtraction';
-import { Button } from '@/components/ui/button';
-import { Label } from '@/components/ui/label';
-import { Input } from '@/components/ui/input';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
-import {
-  Collapsible,
-  CollapsibleContent,
-  CollapsibleTrigger,
-} from '@/components/ui/collapsible';
-import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
-import { Progress } from '@/components/ui/progress';
-import {
-  Loader2,
-  Save,
-  ChevronDown,
-  ChevronUp,
-  AlertCircle,
-  CheckCircle2,
-  ScanText,
-  Info,
-} from 'lucide-react';
+import { extractFromFile } from '../lib/ocrExtraction';
+import type { ExtractedTestData, ExtractedRecordEntry } from '../types/fileUpload';
+import { useUploadFile, useAddMedicalRecord, useListFamilyMembers, useCreateFamilyMember } from '../hooks/useQueries';
+import { RecordType } from '../backend';
 
-const CATEGORY_OPTIONS = [
-  { value: RecordType.CBC, label: 'CBC – Complete Blood Count' },
-  { value: RecordType.LFT, label: 'LFT – Liver Function Test' },
-  { value: RecordType.Cholesterol, label: 'Cholesterol Panel' },
-  { value: RecordType.BloodSugar, label: 'Blood Sugar' },
-  { value: RecordType.BloodPressure, label: 'Blood Pressure' },
-  { value: RecordType.GeneralAilments, label: 'General Ailment' },
-];
-
-function getTodayString() {
-  return new Date().toISOString().split('T')[0];
-}
-
-function generateId() {
-  return `rec_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
-}
-
-const STATUS_LABELS: Record<UploadStatus, string> = {
-  idle: '',
-  reading: 'Reading file…',
-  uploading: 'Uploading file…',
-  extracting: 'Extracting data…',
-  done: 'Extraction complete',
-  error: 'Extraction failed',
+const CATEGORY_TO_RECORD_TYPE: Record<string, RecordType> = {
+  CBC: RecordType.CBC,
+  LFT: RecordType.LFT,
+  Cholesterol: RecordType.Cholesterol,
+  BloodSugar: RecordType.BloodSugar,
+  BloodPressure: RecordType.BloodPressure,
+  GeneralAilments: RecordType.GeneralAilments,
 };
 
-const STATUS_PROGRESS: Record<UploadStatus, number> = {
-  idle: 0,
-  reading: 20,
-  uploading: 55,
-  extracting: 80,
-  done: 100,
-  error: 100,
+type ReviewRecord = ExtractedRecordEntry & {
+  editedFields: Record<string, string>;
+  editedDate: string;
 };
 
 export function UploadRecordForm() {
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
-  const [uploadStatus, setUploadStatus] = useState<UploadStatus>('idle');
-  const [uploadError, setUploadError] = useState<string | null>(null);
-  const [extractedData, setExtractedData] = useState<ExtractedRecordData | null>(null);
-  const [rawTextOpen, setRawTextOpen] = useState(false);
+  const [isExtracting, setIsExtracting] = useState(false);
+  const [extractedData, setExtractedData] = useState<ExtractedTestData | null>(null);
+  const [reviewRecords, setReviewRecords] = useState<ReviewRecord[]>([]);
+  const [selectedMemberId, setSelectedMemberId] = useState<string>('__personal__');
+  const [newMemberName, setNewMemberName] = useState('');
+  const [showNewMemberInput, setShowNewMemberInput] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
 
-  // Form state (pre-populated from OCR)
-  const [category, setCategory] = useState<RecordType>(RecordType.CBC);
-  const [date, setDate] = useState(getTodayString());
-  const [fieldValues, setFieldValues] = useState<Record<string, string>>({});
-  const [formErrors, setFormErrors] = useState<Record<string, string>>({});
-
-  const addRecord = useAddMedicalRecord();
   const uploadFile = useUploadFile();
-
-  const isProcessing = ['reading', 'uploading', 'extracting'].includes(uploadStatus);
-
-  const handleFieldChange = (key: string, value: string) => {
-    setFieldValues((prev) => ({ ...prev, [key]: value }));
-    if (formErrors[key]) {
-      setFormErrors((prev) => { const n = { ...prev }; delete n[key]; return n; });
-    }
-  };
-
-  const handleCategoryChange = (value: RecordType) => {
-    setCategory(value);
-    setFieldValues({});
-    setFormErrors({});
-  };
-
-  const applyExtractedData = useCallback((data: ExtractedRecordData, detectedCategory: RecordType) => {
-    if (data.detectedDate) {
-      setDate(data.detectedDate);
-    }
-    setCategory(detectedCategory);
-
-    const newValues: Record<string, string> = {};
-    for (const pair of data.testNameValuePairs) {
-      newValues[pair.testName] = pair.value;
-    }
-    setFieldValues(newValues);
-  }, []);
+  const addRecord = useAddMedicalRecord();
+  const createFamilyMember = useCreateFamilyMember();
+  const { data: familyMembers = [] } = useListFamilyMembers();
 
   const handleFileSelected = useCallback(async (file: File) => {
     setSelectedFile(file);
-    setUploadError(null);
     setExtractedData(null);
-    setFieldValues({});
-    setFormErrors({});
+    setReviewRecords([]);
+    setIsExtracting(true);
 
     try {
-      // Step 1: Read file bytes
-      setUploadStatus('reading');
       const arrayBuffer: ArrayBuffer = await file.arrayBuffer();
       const bytes = new Uint8Array(arrayBuffer) as Uint8Array<ArrayBuffer>;
+      const result = await extractFromFile(bytes);
+      setExtractedData(result);
 
-      // Step 2: Upload to backend
-      setUploadStatus('uploading');
-      const fileId = `upload_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
-      await uploadFile.mutateAsync({ bytes, fileId, mimeType: file.type });
+      const reviews: ReviewRecord[] = result.records.map((r) => ({
+        ...r,
+        editedFields: { ...r.metricFields },
+        editedDate: r.date ?? new Date().toISOString().split('T')[0],
+      }));
+      setReviewRecords(reviews);
 
-      // Step 3: Extract data client-side
-      setUploadStatus('extracting');
-      const extracted = await extractRecordData(bytes, file.type);
-      setExtractedData(extracted);
-
-      // Determine category
-      let detectedCategory: RecordType = RecordType.CBC;
-      if (extracted.suggestedCategory) {
-        const catMap: Record<string, RecordType> = {
-          CBC: RecordType.CBC,
-          LFT: RecordType.LFT,
-          Cholesterol: RecordType.Cholesterol,
-          BloodSugar: RecordType.BloodSugar,
-          BloodPressure: RecordType.BloodPressure,
-        };
-        detectedCategory = catMap[extracted.suggestedCategory] ?? RecordType.CBC;
+      // Auto-match patient name to family member
+      if (result.patientName) {
+        const matched = familyMembers.find(
+          (m) => m.name.toLowerCase() === result.patientName!.toLowerCase()
+        );
+        if (matched) {
+          setSelectedMemberId(matched.profileId);
+        } else {
+          setNewMemberName(result.patientName);
+          setShowNewMemberInput(true);
+          setSelectedMemberId('__new__');
+        }
       }
-
-      applyExtractedData(extracted, detectedCategory);
-      setUploadStatus('done');
-
-      if (extracted.testNameValuePairs.length === 0) {
-        toast.warning('No test values detected', {
-          description: 'Could not automatically extract test results. Please fill in the fields manually.',
-        });
-      } else {
-        toast.success(`Extracted ${extracted.testNameValuePairs.length} test value(s)`, {
-          description: 'Review and edit the pre-filled fields before saving.',
-        });
-      }
-    } catch (err) {
-      const message = err instanceof Error ? err.message : 'Unknown error occurred';
-      setUploadError(message);
-      setUploadStatus('error');
-      toast.error('Failed to process file', { description: message });
+    } catch {
+      toast.error('Failed to extract data from file');
+    } finally {
+      setIsExtracting(false);
     }
-  }, [uploadFile, applyExtractedData]);
+  }, [familyMembers]);
 
   const handleClearFile = () => {
     setSelectedFile(null);
-    setUploadStatus('idle');
-    setUploadError(null);
     setExtractedData(null);
-    setFieldValues({});
-    setFormErrors({});
-    setDate(getTodayString());
-    setCategory(RecordType.CBC);
+    setReviewRecords([]);
+    setSelectedMemberId('__personal__');
+    setNewMemberName('');
+    setShowNewMemberInput(false);
   };
 
-  function validate(): boolean {
-    const newErrors: Record<string, string> = {};
-    if (!date) newErrors.date = 'Date is required';
-    if (category === RecordType.GeneralAilments) {
-      if (!fieldValues.description?.trim()) newErrors.description = 'Description is required';
-      if (!fieldValues.severity) newErrors.severity = 'Severity is required';
-    } else {
-      const hasAnyValue = Object.values(fieldValues).some((v) => v.trim() !== '');
-      if (!hasAnyValue) newErrors._general = 'Please fill in at least one field';
+  const handleFieldChange = (recordIndex: number, field: string, value: string) => {
+    setReviewRecords((prev) =>
+      prev.map((r, i) =>
+        i === recordIndex ? { ...r, editedFields: { ...r.editedFields, [field]: value } } : r
+      )
+    );
+  };
+
+  const handleDateChange = (recordIndex: number, value: string) => {
+    setReviewRecords((prev) =>
+      prev.map((r, i) => (i === recordIndex ? { ...r, editedDate: value } : r))
+    );
+  };
+
+  const handleSubmit = async () => {
+    if (!selectedFile || reviewRecords.length === 0) return;
+
+    let familyMemberId: string | null = null;
+
+    if (selectedMemberId === '__new__') {
+      if (!newMemberName.trim()) {
+        toast.error('Please enter a name for the new family member');
+        return;
+      }
+      if (familyMembers.length >= 8) {
+        toast.error('Maximum of 8 family members reached');
+        return;
+      }
+      try {
+        const newId = await createFamilyMember.mutateAsync(newMemberName.trim());
+        familyMemberId = newId;
+      } catch {
+        toast.error('Failed to create family member');
+        return;
+      }
+    } else if (selectedMemberId !== '__personal__') {
+      familyMemberId = selectedMemberId;
     }
-    setFormErrors(newErrors);
-    return Object.keys(newErrors).length === 0;
-  }
 
-  async function handleSubmit(e: React.FormEvent) {
-    e.preventDefault();
-    if (!validate()) return;
+    setIsSaving(true);
 
-    const recordDate = BigInt(new Date(date).getTime());
     try {
-      await addRecord.mutateAsync({
-        recordId: generateId(),
-        recordDate,
-        recordType: category,
-        data: fieldValues as unknown as RecordData,
-      });
-      toast.success('Record saved successfully!', {
-        description: `${RECORD_TYPE_LABELS[category]} record for ${new Date(date).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })} has been added.`,
-      });
+      // Upload file
+      const arrayBuffer: ArrayBuffer = await selectedFile.arrayBuffer();
+      const bytes = new Uint8Array(arrayBuffer) as Uint8Array<ArrayBuffer>;
+      const fileId = `upload_${Date.now()}_${Math.random().toString(36).slice(2)}`;
+      await uploadFile.mutateAsync({ bytes, fileId, isTemporary: false });
+
+      // Save each extracted record
+      let savedCount = 0;
+      for (const record of reviewRecords) {
+        const recordType = CATEGORY_TO_RECORD_TYPE[record.category] ?? RecordType.GeneralAilments;
+        const recordId = `${record.category}_${Date.now()}_${Math.random().toString(36).slice(2)}`;
+        const recordDate = BigInt(new Date(record.editedDate).getTime());
+
+        await addRecord.mutateAsync({
+          recordId,
+          recordDate,
+          recordType,
+          data: JSON.stringify(record.editedFields),
+          familyMemberId,
+        });
+        savedCount++;
+      }
+
+      const memberName =
+        selectedMemberId === '__personal__'
+          ? 'My Records'
+          : selectedMemberId === '__new__'
+          ? newMemberName.trim()
+          : familyMembers.find((m) => m.profileId === selectedMemberId)?.name ?? 'Family Member';
+
+      toast.success(`${savedCount} record${savedCount !== 1 ? 's' : ''} added to ${memberName}`);
+
+      // Reset form
       handleClearFile();
     } catch {
-      toast.error('Failed to save record', { description: 'Please try again.' });
+      toast.error('Failed to save records');
+    } finally {
+      setIsSaving(false);
     }
-  }
+  };
 
-  const showForm = uploadStatus === 'done' || uploadStatus === 'error';
+  const canSubmit =
+    reviewRecords.length > 0 &&
+    (selectedMemberId !== '__new__' || newMemberName.trim().length > 0) &&
+    !isSaving;
 
   return (
     <div className="space-y-6">
       {/* Upload zone */}
-      <div className="space-y-2">
-        <Label className="text-sm font-medium">Upload Medical Report</Label>
-        <FileUploadZone
-          onFileSelected={handleFileSelected}
-          disabled={isProcessing}
-          selectedFile={selectedFile}
-          onClear={handleClearFile}
-        />
-      </div>
+      <FileUploadZone
+        onFileSelected={handleFileSelected}
+        disabled={isExtracting || isSaving}
+        selectedFile={selectedFile}
+        onClear={handleClearFile}
+      />
 
-      {/* Processing progress */}
-      {isProcessing && (
-        <div className="space-y-2 animate-fade-in">
-          <div className="flex items-center gap-2">
-            <Loader2 className="w-4 h-4 animate-spin text-primary" />
-            <span className="text-sm text-muted-foreground">{STATUS_LABELS[uploadStatus]}</span>
-          </div>
-          <Progress value={STATUS_PROGRESS[uploadStatus]} className="h-1.5" />
+      {/* Extracting indicator */}
+      {isExtracting && (
+        <div className="flex items-center gap-3 p-4 rounded-lg bg-primary/5 border border-primary/20">
+          <Loader2 className="h-5 w-5 animate-spin text-primary" />
+          <span className="text-sm text-muted-foreground">Extracting data from report…</span>
         </div>
       )}
 
-      {/* Error state */}
-      {uploadStatus === 'error' && uploadError && (
-        <Alert variant="destructive" className="animate-fade-in">
-          <AlertCircle className="h-4 w-4" />
-          <AlertTitle>Extraction Failed</AlertTitle>
-          <AlertDescription>{uploadError}. You can still fill in the form manually below.</AlertDescription>
-        </Alert>
-      )}
-
-      {/* Extraction success summary */}
-      {uploadStatus === 'done' && extractedData && (
-        <div className="animate-fade-in space-y-3">
-          {extractedData.testNameValuePairs.length > 0 ? (
-            <Alert className="border-success/30 bg-success/5">
-              <CheckCircle2 className="h-4 w-4 text-success" />
-              <AlertTitle className="text-success">Data Extracted Successfully</AlertTitle>
-              <AlertDescription className="text-muted-foreground">
-                Found {extractedData.testNameValuePairs.length} test value(s)
-                {extractedData.detectedDate ? ` and date ${extractedData.detectedDate}` : ''}.
-                Review and edit the fields below before saving.
-              </AlertDescription>
-            </Alert>
-          ) : (
-            <Alert className="border-warning/30 bg-warning/5">
-              <Info className="h-4 w-4 text-warning" />
-              <AlertTitle className="text-warning-foreground">No Values Detected</AlertTitle>
-              <AlertDescription className="text-muted-foreground">
-                Could not automatically extract test results from this file. Please fill in the fields manually.
-              </AlertDescription>
-            </Alert>
+      {/* Extraction results */}
+      {extractedData && !isExtracting && (
+        <div className="space-y-4">
+          {/* Patient name detection banner */}
+          {extractedData.patientName && (
+            <div className="flex items-center gap-2 p-3 rounded-lg bg-success/10 border border-success/20">
+              <User className="h-4 w-4 text-success" />
+              <span className="text-sm">
+                Detected patient: <strong>{extractedData.patientName}</strong>
+              </span>
+            </div>
           )}
 
-          {/* Raw extracted text collapsible */}
-          {extractedData.rawExtractedText.trim().length > 0 && (
-            <Collapsible open={rawTextOpen} onOpenChange={setRawTextOpen}>
-              <CollapsibleTrigger asChild>
-                <button
-                  type="button"
-                  className="flex items-center gap-2 text-xs text-muted-foreground hover:text-foreground transition-colors w-full text-left"
-                >
-                  <ScanText className="w-3.5 h-3.5" />
-                  <span>View extracted text</span>
-                  {rawTextOpen ? <ChevronUp className="w-3.5 h-3.5 ml-auto" /> : <ChevronDown className="w-3.5 h-3.5 ml-auto" />}
-                </button>
-              </CollapsibleTrigger>
-              <CollapsibleContent>
-                <div className="mt-2 rounded-lg border border-border bg-muted/40 p-3 max-h-40 overflow-y-auto">
-                  <pre className="text-xs text-muted-foreground whitespace-pre-wrap break-words font-mono leading-relaxed">
-                    {extractedData.rawExtractedText || '(no readable text found)'}
-                  </pre>
-                </div>
-              </CollapsibleContent>
-            </Collapsible>
-          )}
-        </div>
-      )}
-
-      {/* Form — shown after processing or on error */}
-      {showForm && (
-        <form onSubmit={handleSubmit} className="space-y-6 animate-fade-in">
-          <div className="border-t border-border pt-4">
-            <h3 className="text-sm font-semibold text-foreground mb-4 flex items-center gap-2">
-              <span>Record Details</span>
-              <span className="text-xs font-normal text-muted-foreground">(review and edit before saving)</span>
-            </h3>
-          </div>
-
-          {/* Category & Date */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <div className="space-y-1.5">
-              <Label htmlFor="upload-category" className="text-sm font-medium">
-                Record Category <span className="text-destructive">*</span>
-              </Label>
-              <Select value={category} onValueChange={(v) => handleCategoryChange(v as RecordType)}>
-                <SelectTrigger id="upload-category">
-                  <SelectValue />
+          {/* Family member selector */}
+          <Card>
+            <CardHeader className="pb-3">
+              <CardTitle className="text-base flex items-center gap-2">
+                <User className="h-4 w-4" />
+                Assign to Profile
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              <Select
+                value={selectedMemberId}
+                onValueChange={(val) => {
+                  setSelectedMemberId(val);
+                  setShowNewMemberInput(val === '__new__');
+                }}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Select profile" />
                 </SelectTrigger>
                 <SelectContent>
-                  {CATEGORY_OPTIONS.map((opt) => (
-                    <SelectItem key={opt.value} value={opt.value}>
-                      {opt.label}
+                  <SelectItem value="__personal__">My Records (Personal)</SelectItem>
+                  {familyMembers.map((m) => (
+                    <SelectItem key={m.profileId} value={m.profileId}>
+                      {m.name}
                     </SelectItem>
                   ))}
+                  {familyMembers.length < 8 && (
+                    <SelectItem value="__new__">
+                      <span className="flex items-center gap-1">
+                        <Plus className="h-3 w-3" /> Create new profile
+                      </span>
+                    </SelectItem>
+                  )}
                 </SelectContent>
               </Select>
+
+              {showNewMemberInput && (
+                <div className="space-y-1">
+                  <Label htmlFor="new-member-name">New profile name</Label>
+                  <Input
+                    id="new-member-name"
+                    value={newMemberName}
+                    onChange={(e) => setNewMemberName(e.target.value)}
+                    placeholder="Enter name"
+                  />
+                </div>
+              )}
+            </CardContent>
+          </Card>
+
+          {/* Detected records */}
+          {reviewRecords.length > 0 && (
+            <div className="space-y-3">
+              <div className="flex items-center gap-2">
+                <CheckCircle className="h-4 w-4 text-success" />
+                <span className="text-sm font-medium">
+                  {reviewRecords.length} test categor{reviewRecords.length !== 1 ? 'ies' : 'y'} detected
+                </span>
+              </div>
+
+              {reviewRecords.map((record, idx) => (
+                <Card key={idx} className="border-primary/20">
+                  <CardHeader className="pb-2">
+                    <div className="flex items-center justify-between flex-wrap gap-2">
+                      <CardTitle className="text-sm flex items-center gap-2">
+                        <FileText className="h-4 w-4" />
+                        <Badge variant="secondary">{record.category}</Badge>
+                      </CardTitle>
+                      <div className="flex items-center gap-2">
+                        <Label className="text-xs text-muted-foreground">Date:</Label>
+                        <Input
+                          type="date"
+                          value={record.editedDate}
+                          onChange={(e) => handleDateChange(idx, e.target.value)}
+                          className="h-7 text-xs w-36"
+                        />
+                      </div>
+                    </div>
+                  </CardHeader>
+                  <CardContent>
+                    <CategoryFieldSet
+                      category={record.category as RecordType}
+                      values={record.editedFields}
+                      onChange={(field, value) => handleFieldChange(idx, field, value)}
+                    />
+                  </CardContent>
+                </Card>
+              ))}
             </div>
+          )}
 
-            <div className="space-y-1.5">
-              <Label htmlFor="upload-date" className="text-sm font-medium">
-                Record Date <span className="text-destructive">*</span>
-              </Label>
-              <Input
-                id="upload-date"
-                type="date"
-                value={date}
-                max={getTodayString()}
-                onChange={(e) => {
-                  setDate(e.target.value);
-                  if (formErrors.date) setFormErrors((prev) => { const n = { ...prev }; delete n.date; return n; });
-                }}
-                className={formErrors.date ? 'border-destructive' : ''}
-              />
-              {formErrors.date && <p className="text-xs text-destructive">{formErrors.date}</p>}
+          {/* No data detected */}
+          {reviewRecords.length === 0 && (
+            <div className="flex items-center gap-2 p-4 rounded-lg bg-warning/10 border border-warning/20">
+              <AlertCircle className="h-4 w-4 text-warning" />
+              <span className="text-sm text-muted-foreground">
+                No test data could be extracted. Please enter records manually.
+              </span>
             </div>
-          </div>
-
-          <div className="border-t border-border" />
-
-          {/* Dynamic fields */}
-          <div>
-            <h3 className="text-sm font-semibold text-foreground mb-4">
-              {RECORD_TYPE_LABELS[category]} Metrics
-            </h3>
-            <CategoryFieldSet
-              category={category}
-              values={fieldValues}
-              onChange={handleFieldChange}
-            />
-            {formErrors._general && <p className="mt-2 text-xs text-destructive">{formErrors._general}</p>}
-            {formErrors.description && <p className="mt-2 text-xs text-destructive">{formErrors.description}</p>}
-            {formErrors.severity && <p className="mt-2 text-xs text-destructive">{formErrors.severity}</p>}
-          </div>
+          )}
 
           {/* Submit */}
-          <div className="flex justify-end pt-2">
+          {reviewRecords.length > 0 && (
             <Button
-              type="submit"
-              disabled={addRecord.isPending}
-              className="min-w-[140px]"
+              onClick={handleSubmit}
+              disabled={!canSubmit}
+              className="w-full"
             >
-              {addRecord.isPending ? (
+              {isSaving ? (
                 <>
-                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  <Loader2 className="h-4 w-4 animate-spin mr-2" />
                   Saving…
                 </>
               ) : (
-                <>
-                  <Save className="w-4 h-4 mr-2" />
-                  Save Record
-                </>
+                `Save ${reviewRecords.length} Record${reviewRecords.length !== 1 ? 's' : ''}`
               )}
             </Button>
-          </div>
-        </form>
-      )}
-
-      {/* Idle hint when no file selected yet */}
-      {uploadStatus === 'idle' && !selectedFile && (
-        <p className="text-xs text-center text-muted-foreground">
-          Upload a lab report PDF or photo — dates and test values will be detected automatically.
-        </p>
+          )}
+        </div>
       )}
     </div>
   );

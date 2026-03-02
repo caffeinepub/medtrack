@@ -1,17 +1,18 @@
-import Migration "migration";
 import Map "mo:core/Map";
 import Text "mo:core/Text";
+import Array "mo:core/Array";
 import List "mo:core/List";
 import Int "mo:core/Int";
 import Principal "mo:core/Principal";
-import MixinAuthorization "authorization/MixinAuthorization";
-import AccessControl "authorization/access-control";
 import Order "mo:core/Order";
 import Runtime "mo:core/Runtime";
+import MixinAuthorization "authorization/MixinAuthorization";
+import AccessControl "authorization/access-control";
 import Storage "blob-storage/Storage";
 import MixinStorage "blob-storage/Mixin";
 
-(with migration = Migration.run)
+
+
 actor {
   let accessControlState = AccessControl.initState();
   include MixinAuthorization(accessControlState);
@@ -50,22 +51,35 @@ actor {
     name : Text;
   };
 
-  let userProfiles = Map.empty<Principal, UserProfile>();
+  public type FamilyMemberProfile = {
+    profileId : Text;
+    name : Text;
+  };
 
-  let users = Map.empty<Principal, Map.Map<Text, MedicalRecord>>();
+  type AllRecords = {
+    personalRecords : Map.Map<Text, MedicalRecord>;
+    familyMembers : Map.Map<Text, Map.Map<Text, MedicalRecord>>;
+  };
+
+  let userProfiles = Map.empty<Principal, UserProfile>();
+  let users = Map.empty<Principal, AllRecords>();
   let temporaryFiles = Map.empty<Principal, Map.Map<Text, Storage.ExternalBlob>>();
   let uploadedFiles = Map.empty<Text, Storage.ExternalBlob>();
+  let familyMembers = Map.empty<Principal, Map.Map<Text, FamilyMemberProfile>>();
 
-  func getUser(caller : Principal) : Map.Map<Text, MedicalRecord> {
-    let empty = Map.empty<Text, MedicalRecord>();
+  func getAllRecordsForUser(caller : Principal) : AllRecords {
+    let empty : AllRecords = {
+      personalRecords = Map.empty<Text, MedicalRecord>();
+      familyMembers = Map.empty<Text, Map.Map<Text, MedicalRecord>>();
+    };
     switch (users.get(caller)) {
       case (null) { empty };
-      case (?user) { user };
+      case (?allRecords) { allRecords };
     };
   };
 
-  func updateUser(caller : Principal, records : Map.Map<Text, MedicalRecord>) {
-    users.add(caller, records);
+  func updateAllRecordsForUser(caller : Principal, allRecords : AllRecords) {
+    users.add(caller, allRecords);
   };
 
   func requireUser(caller : Principal) {
@@ -97,6 +111,60 @@ actor {
     userProfiles.get(user);
   };
 
+  // Family member profile functions
+
+  public shared ({ caller }) func createFamilyMember(name : Text) : async Text {
+    requireUser(caller);
+
+    let profileId = name;
+
+    // Add to family member profiles
+    let updatedProfiles = switch (familyMembers.get(caller)) {
+      case (null) {
+        let newMap = Map.empty<Text, FamilyMemberProfile>();
+        newMap.add(profileId, { profileId; name });
+        newMap;
+      };
+      case (?profiles) {
+        profiles.add(profileId, { profileId; name });
+        profiles;
+      };
+    };
+
+    familyMembers.add(caller, updatedProfiles);
+    profileId;
+  };
+
+  public query ({ caller }) func listFamilyMembers() : async [FamilyMemberProfile] {
+    requireUser(caller);
+
+    switch (familyMembers.get(caller)) {
+      case (null) { [] };
+      case (?profiles) { profiles.values().toArray() };
+    };
+  };
+
+  public shared ({ caller }) func deleteFamilyMember(profileId : Text) : async () {
+    requireUser(caller);
+
+    switch (familyMembers.get(caller)) {
+      case (null) { Runtime.trap("Family member does not exist") };
+      case (?profiles) {
+        profiles.remove(profileId);
+        if (profiles.isEmpty()) {
+          familyMembers.remove(caller);
+        };
+      };
+    };
+
+    let allRecords = getAllRecordsForUser(caller);
+    if (allRecords.familyMembers.containsKey(profileId)) {
+      let updatedFamilyMembers = allRecords.familyMembers;
+      updatedFamilyMembers.remove(profileId);
+      updateAllRecordsForUser(caller, { allRecords with familyMembers = updatedFamilyMembers });
+    };
+  };
+
   // Medical record functions
 
   public query ({ caller }) func hasMedicalRecordAccess() : async Bool {
@@ -104,7 +172,7 @@ actor {
     true;
   };
 
-  public shared ({ caller }) func addMedicalRecord(recordId : Text, recordDate : Int, recordType : RecordType, data : Text) : async () {
+  public shared ({ caller }) func addMedicalRecord(recordId : Text, recordDate : Int, recordType : RecordType, data : Text, familyMemberId : ?Text) : async () {
     requireUser(caller);
 
     let record : MedicalRecord = {
@@ -114,59 +182,194 @@ actor {
       data;
     };
 
-    let user = getUser(caller);
-    user.add(recordId, record);
-    updateUser(caller, user);
-  };
+    let allRecords = getAllRecordsForUser(caller);
 
-  public shared ({ caller }) func deleteMedicalRecord(recordId : Text) : async () {
-    requireUser(caller);
+    switch (familyMemberId) {
+      case (null) {
+        // Add record to personal records
+        let updated = allRecords.personalRecords;
+        updated.add(recordId, record);
+        let newRecords = {
+          allRecords with
+          personalRecords = updated;
+        };
+        updateAllRecordsForUser(caller, newRecords);
+      };
+      case (?memberId) {
+        // Add record to specific family member
+        if (not allRecords.familyMembers.containsKey(memberId)) {
+          Runtime.trap("Family member does not exist");
+        };
 
-    let user = getUser(caller);
-    switch (user.get(recordId)) {
-      case (null) { Runtime.trap("Record does not exist.") };
-      case (?_) {
-        user.remove(recordId);
-        updateUser(caller, user);
+        let memberRecords = switch (allRecords.familyMembers.get(memberId)) {
+          case (null) { Map.empty<Text, MedicalRecord>() };
+          case (?existing) { existing };
+        };
+
+        memberRecords.add(recordId, record);
+
+        let updatedFamilyMembers = allRecords.familyMembers;
+        updatedFamilyMembers.add(memberId, memberRecords);
+
+        let newRecords = {
+          allRecords with
+          familyMembers = updatedFamilyMembers;
+        };
+        updateAllRecordsForUser(caller, newRecords);
       };
     };
   };
 
-  public query ({ caller }) func getMedicalRecord(recordId : Text) : async MedicalRecord {
+  public shared ({ caller }) func deleteMedicalRecord(recordId : Text, familyMemberId : ?Text) : async () {
     requireUser(caller);
 
-    let user = getUser(caller);
-    switch (user.get(recordId)) {
-      case (null) { Runtime.trap("Record does not exist.") };
-      case (?record) { record };
+    let allRecords = getAllRecordsForUser(caller);
+
+    switch (familyMemberId) {
+      case (null) {
+        if (not allRecords.personalRecords.containsKey(recordId)) {
+          Runtime.trap("Record does not exist.");
+        } else {
+          let updated = allRecords.personalRecords;
+          updated.remove(recordId);
+          let newRecords = {
+            allRecords with
+            personalRecords = updated;
+          };
+          updateAllRecordsForUser(caller, newRecords);
+        };
+      };
+      case (?memberId) {
+        if (not allRecords.familyMembers.containsKey(memberId)) {
+          Runtime.trap("Family member does not exist");
+        };
+
+        switch (allRecords.familyMembers.get(memberId)) {
+          case (null) {
+            Runtime.trap("Record does not exist for this family member");
+          };
+          case (?memberRecords) {
+            if (not memberRecords.containsKey(recordId)) {
+              Runtime.trap("Record does not exist for this family member");
+            } else {
+              let updatedFamilyMembers = allRecords.familyMembers;
+              memberRecords.remove(recordId);
+              updatedFamilyMembers.add(memberId, memberRecords);
+              let newRecords = {
+                allRecords with
+                familyMembers = updatedFamilyMembers;
+              };
+              updateAllRecordsForUser(caller, newRecords);
+            };
+          };
+        };
+      };
     };
   };
 
-  public query ({ caller }) func getAllRecords() : async [MedicalRecord] {
+  public query ({ caller }) func getMedicalRecord(recordId : Text, familyMemberId : ?Text) : async MedicalRecord {
     requireUser(caller);
 
-    let records = getUser(caller).values().toArray();
-    records.sort();
+    let allRecords = getAllRecordsForUser(caller);
+
+    switch (familyMemberId) {
+      case (null) {
+        switch (allRecords.personalRecords.get(recordId)) {
+          case (null) { Runtime.trap("Record does not exist.") };
+          case (?record) { record };
+        };
+      };
+      case (?memberId) {
+        if (not allRecords.familyMembers.containsKey(memberId)) {
+          Runtime.trap("Family member does not exist");
+        };
+
+        switch (allRecords.familyMembers.get(memberId)) {
+          case (null) { Runtime.trap("Record does not exist for this family member") };
+          case (?memberRecords) {
+            switch (memberRecords.get(recordId)) {
+              case (null) { Runtime.trap("Record does not exist for this family member") };
+              case (?record) { record };
+            };
+          };
+        };
+      };
+    };
   };
 
-  public query ({ caller }) func getRecordsByType(recordType : RecordType) : async [MedicalRecord] {
+  public query ({ caller }) func getAllRecords(familyMemberId : ?Text) : async [MedicalRecord] {
+    requireUser(caller);
+
+    let allRecords = getAllRecordsForUser(caller);
+
+    switch (familyMemberId) {
+      case (null) {
+        allRecords.personalRecords.values().toArray().sort();
+      };
+      case (?memberId) {
+        switch (allRecords.familyMembers.get(memberId)) {
+          case (null) {
+            [];
+          };
+          case (?records) {
+            records.values().toArray().sort();
+          };
+        };
+      };
+    };
+  };
+
+  public query ({ caller }) func getRecordsByType(recordType : RecordType, familyMemberId : ?Text) : async [MedicalRecord] {
     requireUser(caller);
 
     let filtered = List.empty<MedicalRecord>();
 
-    for ((_, record) in getUser(caller).entries()) {
-      if (record.recordType == recordType) {
-        filtered.add(record);
+    let allRecords = getAllRecordsForUser(caller);
+
+    switch (familyMemberId) {
+      case (null) {
+        for ((_, record) in allRecords.personalRecords.entries()) {
+          if (record.recordType == recordType) {
+            filtered.add(record);
+          };
+        };
+      };
+      case (?memberId) {
+        switch (allRecords.familyMembers.get(memberId)) {
+          case (null) { return [] };
+          case (?memberRecords) {
+            for ((_, record) in memberRecords.entries()) {
+              if (record.recordType == recordType) {
+                filtered.add(record);
+              };
+            };
+          };
+        };
       };
     };
-
     filtered.toArray();
   };
 
-  public query ({ caller }) func recordExists(recordId : Text) : async Bool {
+  public query ({ caller }) func recordExists(recordId : Text, familyMemberId : ?Text) : async Bool {
     requireUser(caller);
 
-    getUser(caller).containsKey(recordId);
+    let allRecords = getAllRecordsForUser(caller);
+
+    switch (familyMemberId) {
+      case (null) {
+        allRecords.personalRecords.containsKey(recordId);
+      };
+      case (?memberId) {
+        if (not allRecords.familyMembers.containsKey(memberId)) {
+          return false;
+        };
+
+        switch (allRecords.familyMembers.get(memberId)) {
+          case (null) { false };
+          case (?records) { records.containsKey(recordId) };
+        };
+      };
+    };
   };
 
   public query ({ caller }) func listUploadedFiles() : async [(Text, Storage.ExternalBlob)] {

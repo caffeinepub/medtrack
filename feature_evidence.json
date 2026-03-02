@@ -2,14 +2,10 @@
   "kind": "feature_evidence_report",
   "features": [
     {
-      "featureId": "feature-add-an-upload-record-option-to-the-add-record-page-ui-the-upload-flow-must-allow-the-user-to-select-or-drag-and-drop-a-pdf-or-image-file-display-a-preview-or-filename-confirmation-trigger-ocr-extraction-on-the-uploaded-file-and-pre-populate-the-medical-record-form-fields-date-category-and-metric-values-with-the-extracted-data-for-user-review-and-correction-before-submission",
-      "featureTitle": "Add an 'Upload Record' option to the Add Record page UI. The upload flow must allow the user to select or drag-and-drop a PDF or image file, display a preview or filename confirmation, trigger OCR extraction on the uploaded file, and pre-populate the medical record form fields (date, category, and metric values) with the extracted data for user review and correction before submission.",
+      "featureId": "feature-fix-the-date-extraction-logic-in-frontend-src-lib-ocrextraction-ts-so-that-the-report-date-is-reliably-detected-from-uploaded-medical-report-documents-expand-the-regex-patterns-to-cover-common-date-formats-found-in-medical-reports-including-but-not-limited-to-dd-mm-yyyy-mm-dd-yyyy-yyyy-mm-dd-dd-mm-yyyy-dd-mmm-yyyy-e-g-12-jan-2024-mmm-dd-yyyy-e-g-jan-12-2024-and-label-prefixed-formats-such-as-date-report-date-collection-date-sample-date-test-date-and-date-of-report-the-extracted-date-must-be-returned-as-a-valid-iso-date-string-yyyy-mm-dd-in-the-extractedtestdata-result-and-pre-populated-in-the-date-field-of-each-extracted-record-displayed-in-the-uploadrecordform-component",
+      "featureTitle": "Fix the date extraction logic in `frontend/src/lib/ocrExtraction.ts` so that the report date is reliably detected from uploaded medical report documents. Expand the regex patterns to cover common date formats found in medical reports, including but not limited to: 'DD/MM/YYYY', 'MM/DD/YYYY', 'YYYY-MM-DD', 'DD-MM-YYYY', 'DD MMM YYYY' (e.g., '12 Jan 2024'), 'MMM DD, YYYY' (e.g., 'Jan 12, 2024'), and label-prefixed formats such as 'Date:', 'Report Date:', 'Collection Date:', 'Sample Date:', 'Test Date:', and 'Date of Report:'. The extracted date must be returned as a valid ISO date string (YYYY-MM-DD) in the `ExtractedTestData` result and pre-populated in the date field of each extracted record displayed in the `UploadRecordForm` component.",
       "files": [
-        "frontend/src/components/FileUploadZone.tsx",
-        "frontend/src/components/UploadRecordForm.tsx",
-        "frontend/src/hooks/useQueries.ts",
-        "frontend/src/pages/AddRecordPage.tsx",
-        "frontend/src/types/fileUpload.ts"
+        "frontend/src/lib/ocrExtraction.ts"
       ],
       "components": [
         "core-infrastructure@1.0.2",
@@ -21,7 +17,7 @@
         "blob-storage@4.0.0"
       ],
       "testIds": [
-        "REQ-12"
+        "REQ-19"
       ],
       "confidence": "high"
     }

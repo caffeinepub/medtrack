@@ -1,42 +1,49 @@
-import {
-  RouterProvider,
-  createRouter,
-  createRoute,
-  createRootRoute,
-  Outlet,
-  useNavigate,
-} from '@tanstack/react-router';
+import React from 'react';
+import { createRouter, createRoute, createRootRoute, Outlet, redirect } from '@tanstack/react-router';
+import { RouterProvider } from '@tanstack/react-router';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { ThemeProvider } from 'next-themes';
 import { Toaster } from '@/components/ui/sonner';
-import { useEffect } from 'react';
 import { Layout } from './components/Layout';
+import { LoginPage } from './pages/LoginPage';
 import { HomePage } from './pages/HomePage';
 import { AddRecordPage } from './pages/AddRecordPage';
 import { TimelinePage } from './pages/TimelinePage';
 import { AnalysisPage } from './pages/AnalysisPage';
-import { LoginPage } from './pages/LoginPage';
+import FamilyMembersPage from './pages/FamilyMembersPage';
 import { useInternetIdentity } from './hooks/useInternetIdentity';
 
-// Root route — bare outlet, no shell
+const queryClient = new QueryClient();
+
+// Root route
 const rootRoute = createRootRoute({
   component: () => <Outlet />,
 });
 
-// Login route — standalone page, no auth required
+// Login route (standalone)
 const loginRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: '/login',
   component: LoginPage,
 });
 
-// Protected layout route — wraps all authenticated pages
+// Protected layout route
+function ProtectedLayout() {
+  const { identity, isInitializing } = useInternetIdentity();
+  if (isInitializing) return null;
+  if (!identity) {
+    throw redirect({ to: '/login' });
+  }
+  return <Layout />;
+}
+
 const layoutRoute = createRoute({
   getParentRoute: () => rootRoute,
   id: 'layout',
   component: ProtectedLayout,
 });
 
-// Authenticated child routes
-const indexRoute = createRoute({
+const homeRoute = createRoute({
   getParentRoute: () => layoutRoute,
   path: '/',
   component: HomePage,
@@ -60,9 +67,21 @@ const analysisRoute = createRoute({
   component: AnalysisPage,
 });
 
+const familyMembersRoute = createRoute({
+  getParentRoute: () => layoutRoute,
+  path: '/family-members',
+  component: FamilyMembersPage,
+});
+
 const routeTree = rootRoute.addChildren([
   loginRoute,
-  layoutRoute.addChildren([indexRoute, addRoute, timelineRoute, analysisRoute]),
+  layoutRoute.addChildren([
+    homeRoute,
+    addRoute,
+    timelineRoute,
+    analysisRoute,
+    familyMembersRoute,
+  ]),
 ]);
 
 const router = createRouter({ routeTree });
@@ -73,28 +92,13 @@ declare module '@tanstack/react-router' {
   }
 }
 
-// Protected layout: redirects to /login if not authenticated, then renders Layout
-function ProtectedLayout() {
-  const { identity, isInitializing } = useInternetIdentity();
-  const navigate = useNavigate();
-  const isAuthenticated = !!identity;
-
-  useEffect(() => {
-    if (!isInitializing && !isAuthenticated) {
-      navigate({ to: '/login' });
-    }
-  }, [isAuthenticated, isInitializing, navigate]);
-
-  if (isInitializing || !isAuthenticated) return null;
-
-  return <Layout />;
-}
-
 export default function App() {
   return (
-    <>
-      <RouterProvider router={router} />
-      <Toaster richColors position="top-right" />
-    </>
+    <QueryClientProvider client={queryClient}>
+      <ThemeProvider attribute="class" defaultTheme="system" enableSystem>
+        <RouterProvider router={router} />
+        <Toaster richColors position="top-right" />
+      </ThemeProvider>
+    </QueryClientProvider>
   );
 }

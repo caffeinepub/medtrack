@@ -1,101 +1,40 @@
 {
   "kind": "build_request",
-  "title": "Upload Medical Records with OCR Extraction",
+  "title": "Fix OCR date extraction from uploaded medical report documents",
   "projectName": "MediTrack",
-  "priority": "normal",
+  "priority": "high",
   "requirements": [
     {
-      "id": "REQ-10",
-      "text": "Add a backend endpoint that accepts an uploaded file (PDF or image encoded as binary/base64), stores the raw file data per principal, and returns a stable reference ID for the uploaded asset.",
-      "target": "backend",
-      "source": {
-        "messageIds": [
-          "msg-4"
-        ],
-        "quotes": [
-          "I need an option to upload record which will be in pdf or image"
-        ]
-      },
-      "acceptanceCriteria": [
-        "Backend exposes an `uploadFile` endpoint accepting file bytes and a MIME type (image/png, image/jpeg, application/pdf).",
-        "Uploaded file is stored per caller principal alongside a unique record ID and upload timestamp.",
-        "Endpoint returns the assigned file reference ID on success.",
-        "Endpoint rejects unauthenticated callers (anonymous principal)."
-      ]
-    },
-    {
-      "id": "REQ-11",
-      "text": "Add a backend OCR processing endpoint that takes a stored file reference ID, performs text extraction on the file content, and returns structured fields: detected date, test names, and test result values parsed from the extracted text.",
-      "target": "backend",
-      "source": {
-        "messageIds": [
-          "msg-4"
-        ],
-        "quotes": [
-          "it needs to be ocr and dates and test and test results needs to be captured"
-        ]
-      },
-      "acceptanceCriteria": [
-        "Backend exposes an `extractRecordFromFile` endpoint that accepts a file reference ID.",
-        "The endpoint performs OCR-style text parsing on the stored file bytes to extract date strings, test name tokens, and numeric result values.",
-        "Returns a structured response containing: detected date (ISO string or null), an array of { testName: Text, value: Text } pairs, and a raw extracted text string for user review.",
-        "Only the owning principal can trigger extraction on their own uploaded files."
-      ]
-    },
-    {
-      "id": "REQ-12",
-      "text": "Add an 'Upload Record' option to the Add Record page UI. The upload flow must allow the user to select or drag-and-drop a PDF or image file, display a preview or filename confirmation, trigger OCR extraction on the uploaded file, and pre-populate the medical record form fields (date, category, and metric values) with the extracted data for user review and correction before submission.",
+      "id": "REQ-19",
+      "text": "Fix the date extraction logic in `frontend/src/lib/ocrExtraction.ts` so that the report date is reliably detected from uploaded medical report documents. Expand the regex patterns to cover common date formats found in medical reports, including but not limited to: 'DD/MM/YYYY', 'MM/DD/YYYY', 'YYYY-MM-DD', 'DD-MM-YYYY', 'DD MMM YYYY' (e.g., '12 Jan 2024'), 'MMM DD, YYYY' (e.g., 'Jan 12, 2024'), and label-prefixed formats such as 'Date:', 'Report Date:', 'Collection Date:', 'Sample Date:', 'Test Date:', and 'Date of Report:'. The extracted date must be returned as a valid ISO date string (YYYY-MM-DD) in the `ExtractedTestData` result and pre-populated in the date field of each extracted record displayed in the `UploadRecordForm` component.",
       "target": "frontend",
       "source": {
         "messageIds": [
-          "msg-4"
+          "msg-1"
         ],
         "quotes": [
-          "I need an option to upload record which will be in pdf or image and it needs to be ocr and dates and test and test results needs to be captured"
+          "date isnt picked from the document"
         ]
       },
       "acceptanceCriteria": [
-        "The Add Record page shows a clearly labelled 'Upload Record' tab or toggle alongside the existing manual entry form.",
-        "The upload area accepts PDF and image files (image/png, image/jpeg, application/pdf) via file picker or drag-and-drop.",
-        "After a file is selected, a loading/processing state is shown while OCR extraction runs.",
-        "On extraction success, the date field, category selector, and relevant metric fields are pre-populated with detected values.",
-        "A read-only 'Extracted Text' expandable section shows the raw OCR output so the user can verify accuracy.",
-        "The user can edit any pre-populated field before submitting the record normally.",
-        "If OCR extraction returns no usable data, a clear error/warning message is shown and the form remains editable.",
-        "File size is validated client-side; files larger than 5 MB show a user-friendly error."
-      ]
-    },
-    {
-      "id": "REQ-13",
-      "text": "Add a `listUploadedFiles` backend endpoint that returns metadata (file ID, upload timestamp, MIME type) for all files uploaded by the calling principal, and a `deleteUploadedFile` endpoint to remove a file by ID.",
-      "target": "backend",
-      "source": {
-        "messageIds": [
-          "msg-4"
-        ],
-        "quotes": [
-          "I need an option to upload record which will be in pdf or image"
-        ]
-      },
-      "acceptanceCriteria": [
-        "Authenticated principals can list their own uploaded file metadata.",
-        "Authenticated principals can delete their own uploaded files by ID.",
-        "Principals cannot access or delete files belonging to other principals."
+        "Uploading a medical report PDF or image with a date in any of the supported formats results in the date field being correctly pre-populated in the review form.",
+        "Dates prefixed with labels like 'Date:', 'Report Date:', 'Collection Date:', 'Sample Date:', 'Test Date:', or 'Date of Report:' are correctly parsed.",
+        "Unlabelled dates in common formats (DD/MM/YYYY, MM/DD/YYYY, YYYY-MM-DD, DD-MM-YYYY, DD MMM YYYY, MMM DD YYYY) are detected and returned.",
+        "The extracted date is converted to a valid ISO 8601 string (YYYY-MM-DD) before being set in the form state.",
+        "If no date is found, the date field remains empty (no crash or invalid value is set).",
+        "All previously passing OCR extraction tests for patient name and test categories continue to pass."
       ]
     }
   ],
   "constraints": [
-    "All file storage and OCR logic must remain within the single Motoko actor (no external services or microservices).",
-    "Do not modify immutable frontend paths: frontend/src/hooks/useInternetIdentity.ts, frontend/src/hooks/useActor.ts, frontend/src/main.tsx, frontend/src/components/ui.",
-    "The existing manual medical record entry form must remain fully functional and unaltered.",
-    "File uploads must be scoped per caller principal — users can only access their own uploaded files."
+    "Do not modify any file under frontend/src/hooks/ (immutable paths).",
+    "Do not modify frontend/src/components/ui/ (immutable paths).",
+    "Changes must be limited to the OCR extraction utility and, if necessary, the UploadRecordForm component for wiring the date field."
   ],
   "nonGoals": [
-    "Automatic submission of extracted records without user review and confirmation.",
-    "Integration with any external OCR API or third-party cloud service.",
-    "Storing rendered PDF page previews or image thumbnails beyond what is needed for OCR.",
-    "Support for file formats other than PDF, PNG, and JPEG.",
-    "Batch upload of multiple files simultaneously."
+    "Adding backend OCR processing — extraction remains client-side.",
+    "Changing the date storage format in the backend data model.",
+    "Altering any other OCR extraction fields (patient name, test categories, metric values)."
   ],
   "imageRequirements": {
     "required": [],

@@ -1,29 +1,28 @@
 export interface FileMetadata {
-  fileId: string;
-  uploadTimestamp: number;
-  mimeType: string;
-  fileName: string;
-  fileSize: number;
+  name: string;
+  size: number;
+  type: string;
+  lastModified: number;
 }
 
-export interface ExtractedTestPair {
-  testName: string;
-  value: string;
+export interface ExtractedRecordEntry {
+  category: string;
+  metricFields: Record<string, string>;
+  date: string | null;
 }
 
-export interface ExtractedRecordData {
-  detectedDate: string | null;
-  testNameValuePairs: ExtractedTestPair[];
+export interface ExtractedTestData {
+  patientName: string | null;
+  records: ExtractedRecordEntry[];
   rawExtractedText: string;
-  suggestedCategory: string | null;
 }
 
-export type UploadStatus = 'idle' | 'reading' | 'uploading' | 'extracting' | 'done' | 'error';
+export type UploadStatus = 'idle' | 'uploading' | 'extracting' | 'review' | 'saving' | 'success' | 'error';
 
 export interface UploadState {
   status: UploadStatus;
-  progress: number;
+  file: File | null;
+  fileId: string | null;
+  extractedData: ExtractedTestData | null;
   error: string | null;
-  fileMetadata: FileMetadata | null;
-  extractedData: ExtractedRecordData | null;
 }

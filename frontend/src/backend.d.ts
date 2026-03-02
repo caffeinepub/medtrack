@@ -20,6 +20,10 @@ export interface MedicalRecord {
     recordType: RecordType;
     recordId: string;
 }
+export interface FamilyMemberProfile {
+    name: string;
+    profileId: string;
+}
 export interface UserProfile {
     name: string;
 }
@@ -37,20 +41,23 @@ export enum UserRole {
     guest = "guest"
 }
 export interface backendInterface {
-    addMedicalRecord(recordId: string, recordDate: bigint, recordType: RecordType, data: string): Promise<void>;
+    addMedicalRecord(recordId: string, recordDate: bigint, recordType: RecordType, data: string, familyMemberId: string | null): Promise<void>;
     assignCallerUserRole(user: Principal, role: UserRole): Promise<void>;
-    deleteMedicalRecord(recordId: string): Promise<void>;
+    createFamilyMember(name: string): Promise<string>;
+    deleteFamilyMember(profileId: string): Promise<void>;
+    deleteMedicalRecord(recordId: string, familyMemberId: string | null): Promise<void>;
     deleteUploadedFile(fileId: string, isTemporary: boolean): Promise<void>;
-    getAllRecords(): Promise<Array<MedicalRecord>>;
+    getAllRecords(familyMemberId: string | null): Promise<Array<MedicalRecord>>;
     getCallerUserProfile(): Promise<UserProfile | null>;
     getCallerUserRole(): Promise<UserRole>;
-    getMedicalRecord(recordId: string): Promise<MedicalRecord>;
-    getRecordsByType(recordType: RecordType): Promise<Array<MedicalRecord>>;
+    getMedicalRecord(recordId: string, familyMemberId: string | null): Promise<MedicalRecord>;
+    getRecordsByType(recordType: RecordType, familyMemberId: string | null): Promise<Array<MedicalRecord>>;
     getUserProfile(user: Principal): Promise<UserProfile | null>;
     hasMedicalRecordAccess(): Promise<boolean>;
     isCallerAdmin(): Promise<boolean>;
+    listFamilyMembers(): Promise<Array<FamilyMemberProfile>>;
     listUploadedFiles(): Promise<Array<[string, ExternalBlob]>>;
-    recordExists(recordId: string): Promise<boolean>;
+    recordExists(recordId: string, familyMemberId: string | null): Promise<boolean>;
     saveCallerUserProfile(profile: UserProfile): Promise<void>;
     uploadFileAndGetReference(blob: ExternalBlob, fileId: string, isTemporary: boolean): Promise<string>;
 }

@@ -39,6 +39,10 @@ export const MedicalRecord = IDL.Record({
   'recordId' : IDL.Text,
 });
 export const UserProfile = IDL.Record({ 'name' : IDL.Text });
+export const FamilyMemberProfile = IDL.Record({
+  'name' : IDL.Text,
+  'profileId' : IDL.Text,
+});
 export const ExternalBlob = IDL.Vec(IDL.Nat8);
 
 export const idlService = IDL.Service({
@@ -70,19 +74,29 @@ export const idlService = IDL.Service({
   '_caffeineStorageUpdateGatewayPrincipals' : IDL.Func([], [], []),
   '_initializeAccessControlWithSecret' : IDL.Func([IDL.Text], [], []),
   'addMedicalRecord' : IDL.Func(
-      [IDL.Text, IDL.Int, RecordType, IDL.Text],
+      [IDL.Text, IDL.Int, RecordType, IDL.Text, IDL.Opt(IDL.Text)],
       [],
       [],
     ),
   'assignCallerUserRole' : IDL.Func([IDL.Principal, UserRole], [], []),
-  'deleteMedicalRecord' : IDL.Func([IDL.Text], [], []),
+  'createFamilyMember' : IDL.Func([IDL.Text], [IDL.Text], []),
+  'deleteFamilyMember' : IDL.Func([IDL.Text], [], []),
+  'deleteMedicalRecord' : IDL.Func([IDL.Text, IDL.Opt(IDL.Text)], [], []),
   'deleteUploadedFile' : IDL.Func([IDL.Text, IDL.Bool], [], []),
-  'getAllRecords' : IDL.Func([], [IDL.Vec(MedicalRecord)], ['query']),
+  'getAllRecords' : IDL.Func(
+      [IDL.Opt(IDL.Text)],
+      [IDL.Vec(MedicalRecord)],
+      ['query'],
+    ),
   'getCallerUserProfile' : IDL.Func([], [IDL.Opt(UserProfile)], ['query']),
   'getCallerUserRole' : IDL.Func([], [UserRole], ['query']),
-  'getMedicalRecord' : IDL.Func([IDL.Text], [MedicalRecord], ['query']),
+  'getMedicalRecord' : IDL.Func(
+      [IDL.Text, IDL.Opt(IDL.Text)],
+      [MedicalRecord],
+      ['query'],
+    ),
   'getRecordsByType' : IDL.Func(
-      [RecordType],
+      [RecordType, IDL.Opt(IDL.Text)],
       [IDL.Vec(MedicalRecord)],
       ['query'],
     ),
@@ -93,12 +107,17 @@ export const idlService = IDL.Service({
     ),
   'hasMedicalRecordAccess' : IDL.Func([], [IDL.Bool], ['query']),
   'isCallerAdmin' : IDL.Func([], [IDL.Bool], ['query']),
+  'listFamilyMembers' : IDL.Func([], [IDL.Vec(FamilyMemberProfile)], ['query']),
   'listUploadedFiles' : IDL.Func(
       [],
       [IDL.Vec(IDL.Tuple(IDL.Text, ExternalBlob))],
       ['query'],
     ),
-  'recordExists' : IDL.Func([IDL.Text], [IDL.Bool], ['query']),
+  'recordExists' : IDL.Func(
+      [IDL.Text, IDL.Opt(IDL.Text)],
+      [IDL.Bool],
+      ['query'],
+    ),
   'saveCallerUserProfile' : IDL.Func([UserProfile], [], []),
   'uploadFileAndGetReference' : IDL.Func(
       [ExternalBlob, IDL.Text, IDL.Bool],
@@ -141,6 +160,10 @@ export const idlFactory = ({ IDL }) => {
     'recordId' : IDL.Text,
   });
   const UserProfile = IDL.Record({ 'name' : IDL.Text });
+  const FamilyMemberProfile = IDL.Record({
+    'name' : IDL.Text,
+    'profileId' : IDL.Text,
+  });
   const ExternalBlob = IDL.Vec(IDL.Nat8);
   
   return IDL.Service({
@@ -172,19 +195,29 @@ export const idlFactory = ({ IDL }) => {
     '_caffeineStorageUpdateGatewayPrincipals' : IDL.Func([], [], []),
     '_initializeAccessControlWithSecret' : IDL.Func([IDL.Text], [], []),
     'addMedicalRecord' : IDL.Func(
-        [IDL.Text, IDL.Int, RecordType, IDL.Text],
+        [IDL.Text, IDL.Int, RecordType, IDL.Text, IDL.Opt(IDL.Text)],
         [],
         [],
       ),
     'assignCallerUserRole' : IDL.Func([IDL.Principal, UserRole], [], []),
-    'deleteMedicalRecord' : IDL.Func([IDL.Text], [], []),
+    'createFamilyMember' : IDL.Func([IDL.Text], [IDL.Text], []),
+    'deleteFamilyMember' : IDL.Func([IDL.Text], [], []),
+    'deleteMedicalRecord' : IDL.Func([IDL.Text, IDL.Opt(IDL.Text)], [], []),
     'deleteUploadedFile' : IDL.Func([IDL.Text, IDL.Bool], [], []),
-    'getAllRecords' : IDL.Func([], [IDL.Vec(MedicalRecord)], ['query']),
+    'getAllRecords' : IDL.Func(
+        [IDL.Opt(IDL.Text)],
+        [IDL.Vec(MedicalRecord)],
+        ['query'],
+      ),
     'getCallerUserProfile' : IDL.Func([], [IDL.Opt(UserProfile)], ['query']),
     'getCallerUserRole' : IDL.Func([], [UserRole], ['query']),
-    'getMedicalRecord' : IDL.Func([IDL.Text], [MedicalRecord], ['query']),
+    'getMedicalRecord' : IDL.Func(
+        [IDL.Text, IDL.Opt(IDL.Text)],
+        [MedicalRecord],
+        ['query'],
+      ),
     'getRecordsByType' : IDL.Func(
-        [RecordType],
+        [RecordType, IDL.Opt(IDL.Text)],
         [IDL.Vec(MedicalRecord)],
         ['query'],
       ),
@@ -195,12 +228,21 @@ export const idlFactory = ({ IDL }) => {
       ),
     'hasMedicalRecordAccess' : IDL.Func([], [IDL.Bool], ['query']),
     'isCallerAdmin' : IDL.Func([], [IDL.Bool], ['query']),
+    'listFamilyMembers' : IDL.Func(
+        [],
+        [IDL.Vec(FamilyMemberProfile)],
+        ['query'],
+      ),
     'listUploadedFiles' : IDL.Func(
         [],
         [IDL.Vec(IDL.Tuple(IDL.Text, ExternalBlob))],
         ['query'],
       ),
-    'recordExists' : IDL.Func([IDL.Text], [IDL.Bool], ['query']),
+    'recordExists' : IDL.Func(
+        [IDL.Text, IDL.Opt(IDL.Text)],
+        [IDL.Bool],
+        ['query'],
+      ),
     'saveCallerUserProfile' : IDL.Func([UserProfile], [], []),
     'uploadFileAndGetReference' : IDL.Func(
         [ExternalBlob, IDL.Text, IDL.Bool],

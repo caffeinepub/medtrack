@@ -1,6 +1,6 @@
-import { Link, useLocation } from '@tanstack/react-router';
-import { Activity, PlusCircle, Clock, BarChart2, Menu, X } from 'lucide-react';
 import { useState } from 'react';
+import { Link, useLocation } from '@tanstack/react-router';
+import { Activity, PlusCircle, Clock, BarChart2, Users, Menu, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { UserIdentityIndicator } from './UserIdentityIndicator';
 import { useInternetIdentity } from '../hooks/useInternetIdentity';
@@ -8,6 +8,7 @@ import { useInternetIdentity } from '../hooks/useInternetIdentity';
 const navLinks = [
   { to: '/add', label: 'Add Record', icon: PlusCircle },
   { to: '/timeline', label: 'Timeline', icon: Clock },
+  { to: '/family-members', label: 'Family', icon: Users },
   { to: '/analysis', label: 'Analysis', icon: BarChart2 },
 ];
 

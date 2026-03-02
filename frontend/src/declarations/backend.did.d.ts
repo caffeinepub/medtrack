@@ -11,6 +11,7 @@ import type { IDL } from '@icp-sdk/core/candid';
 import type { Principal } from '@icp-sdk/core/principal';
 
 export type ExternalBlob = Uint8Array;
+export interface FamilyMemberProfile { 'name' : string, 'profileId' : string }
 export interface MedicalRecord {
   'data' : string,
   'recordDate' : bigint,
@@ -56,22 +57,28 @@ export interface _SERVICE {
   '_caffeineStorageUpdateGatewayPrincipals' : ActorMethod<[], undefined>,
   '_initializeAccessControlWithSecret' : ActorMethod<[string], undefined>,
   'addMedicalRecord' : ActorMethod<
-    [string, bigint, RecordType, string],
+    [string, bigint, RecordType, string, [] | [string]],
     undefined
   >,
   'assignCallerUserRole' : ActorMethod<[Principal, UserRole], undefined>,
-  'deleteMedicalRecord' : ActorMethod<[string], undefined>,
+  'createFamilyMember' : ActorMethod<[string], string>,
+  'deleteFamilyMember' : ActorMethod<[string], undefined>,
+  'deleteMedicalRecord' : ActorMethod<[string, [] | [string]], undefined>,
   'deleteUploadedFile' : ActorMethod<[string, boolean], undefined>,
-  'getAllRecords' : ActorMethod<[], Array<MedicalRecord>>,
+  'getAllRecords' : ActorMethod<[[] | [string]], Array<MedicalRecord>>,
   'getCallerUserProfile' : ActorMethod<[], [] | [UserProfile]>,
   'getCallerUserRole' : ActorMethod<[], UserRole>,
-  'getMedicalRecord' : ActorMethod<[string], MedicalRecord>,
-  'getRecordsByType' : ActorMethod<[RecordType], Array<MedicalRecord>>,
+  'getMedicalRecord' : ActorMethod<[string, [] | [string]], MedicalRecord>,
+  'getRecordsByType' : ActorMethod<
+    [RecordType, [] | [string]],
+    Array<MedicalRecord>
+  >,
   'getUserProfile' : ActorMethod<[Principal], [] | [UserProfile]>,
   'hasMedicalRecordAccess' : ActorMethod<[], boolean>,
   'isCallerAdmin' : ActorMethod<[], boolean>,
+  'listFamilyMembers' : ActorMethod<[], Array<FamilyMemberProfile>>,
   'listUploadedFiles' : ActorMethod<[], Array<[string, ExternalBlob]>>,
-  'recordExists' : ActorMethod<[string], boolean>,
+  'recordExists' : ActorMethod<[string, [] | [string]], boolean>,
   'saveCallerUserProfile' : ActorMethod<[UserProfile], undefined>,
   'uploadFileAndGetReference' : ActorMethod<
     [ExternalBlob, string, boolean],

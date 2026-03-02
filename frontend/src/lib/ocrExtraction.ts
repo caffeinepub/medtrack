@@ -1,216 +1,346 @@
-import type { ExtractedRecordData, ExtractedTestPair } from '../types/fileUpload';
+import { ExtractedTestData, ExtractedRecordEntry } from '../types/fileUpload';
 
-// ─── Date extraction ──────────────────────────────────────────────────────────
+// ── helpers ──────────────────────────────────────────────────────────────────
 
-const DATE_PATTERNS = [
-  // ISO: 2024-03-15
-  /\b(\d{4}[-/]\d{1,2}[-/]\d{1,2})\b/g,
-  // US: 03/15/2024 or 03-15-2024
-  /\b(\d{1,2}[-/]\d{1,2}[-/]\d{4})\b/g,
-  // Long: March 15, 2024 or 15 March 2024
-  /\b(\d{1,2}\s+(?:Jan(?:uary)?|Feb(?:ruary)?|Mar(?:ch)?|Apr(?:il)?|May|Jun(?:e)?|Jul(?:y)?|Aug(?:ust)?|Sep(?:tember)?|Oct(?:ober)?|Nov(?:ember)?|Dec(?:ember)?)\s+\d{4})\b/gi,
-  /\b((?:Jan(?:uary)?|Feb(?:ruary)?|Mar(?:ch)?|Apr(?:il)?|May|Jun(?:e)?|Jul(?:y)?|Aug(?:ust)?|Sep(?:tember)?|Oct(?:ober)?|Nov(?:ember)?|Dec(?:ember)?)\s+\d{1,2},?\s+\d{4})\b/gi,
-];
+function extractText(bytes: Uint8Array): string {
+  try {
+    const decoder = new TextDecoder('utf-8', { fatal: false });
+    return decoder.decode(bytes);
+  } catch {
+    return '';
+  }
+}
+
+const MONTH_MAP: Record<string, number> = {
+  jan: 1, feb: 2, mar: 3, apr: 4, may: 5, jun: 6,
+  jul: 7, aug: 8, sep: 9, oct: 10, nov: 11, dec: 12,
+  january: 1, february: 2, march: 3, april: 4, june: 6,
+  july: 7, august: 8, september: 9, october: 10, november: 11, december: 12,
+};
+
+function toISO(day: number, month: number, year: number): string | null {
+  if (year < 100) year += 2000;
+  if (month < 1 || month > 12 || day < 1 || day > 31 || year < 1900 || year > 2100) return null;
+  const d = new Date(year, month - 1, day);
+  if (d.getFullYear() !== year || d.getMonth() !== month - 1 || d.getDate() !== day) return null;
+  return `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+}
+
+function parseRawDate(raw: string): string | null {
+  raw = raw.trim();
+
+  // YYYY-MM-DD or YYYY/MM/DD or YYYY.MM.DD
+  const isoMatch = raw.match(/^(\d{4})[\/\-\.](\d{1,2})[\/\-\.](\d{1,2})$/);
+  if (isoMatch) {
+    return toISO(parseInt(isoMatch[3]), parseInt(isoMatch[2]), parseInt(isoMatch[1]));
+  }
+
+  // DD MMM YYYY or DD MMMM YYYY (e.g., "12 Jan 2024", "12 January 2024")
+  const dMonthY = raw.match(/^(\d{1,2})\s+([A-Za-z]+)\s+(\d{4})$/);
+  if (dMonthY) {
+    const month = MONTH_MAP[dMonthY[2].toLowerCase()];
+    if (month) return toISO(parseInt(dMonthY[1]), month, parseInt(dMonthY[3]));
+  }
+
+  // MMM DD, YYYY or MMM DD YYYY (e.g., "Jan 12, 2024", "January 12 2024")
+  const monthDY = raw.match(/^([A-Za-z]+)\s+(\d{1,2}),?\s+(\d{4})$/);
+  if (monthDY) {
+    const month = MONTH_MAP[monthDY[1].toLowerCase()];
+    if (month) return toISO(parseInt(monthDY[2]), month, parseInt(monthDY[3]));
+  }
+
+  // DD/MM/YYYY or DD-MM-YYYY or DD.MM.YYYY
+  const dmyMatch = raw.match(/^(\d{1,2})[\/\-\.](\d{1,2})[\/\-\.](\d{2,4})$/);
+  if (dmyMatch) {
+    const d = parseInt(dmyMatch[1]);
+    const m = parseInt(dmyMatch[2]);
+    const y = parseInt(dmyMatch[3]);
+    // Try DD/MM/YYYY first (most common in medical reports outside US)
+    const ddmm = toISO(d, m, y);
+    if (ddmm) return ddmm;
+    // Fallback: MM/DD/YYYY
+    return toISO(m, d, y);
+  }
+
+  return null;
+}
 
 function extractDate(text: string): string | null {
-  for (const pattern of DATE_PATTERNS) {
-    pattern.lastIndex = 0;
-    const match = pattern.exec(text);
-    if (match) {
-      const raw = match[1];
-      const parsed = new Date(raw);
-      if (!isNaN(parsed.getTime())) {
-        return parsed.toISOString().split('T')[0];
+  const DATE_LABEL = /(?:date\s*of\s*report|report\s*date|collection\s*date|sample\s*date|test\s*date|date)\s*[:\-]\s*/i;
+
+  // Labeled patterns — try these first for higher confidence
+  const labeledPatterns: RegExp[] = [
+    // Label + YYYY-MM-DD / YYYY/MM/DD
+    new RegExp(DATE_LABEL.source + '(\\d{4}[\\\/\\-\\.]\\d{1,2}[\\\/\\-\\.]\\d{1,2})', 'i'),
+    // Label + DD/MM/YYYY or DD-MM-YYYY
+    new RegExp(DATE_LABEL.source + '(\\d{1,2}[\\\/\\-\\.]\\d{1,2}[\\\/\\-\\.]\\d{2,4})', 'i'),
+    // Label + DD MMM YYYY
+    new RegExp(DATE_LABEL.source + '(\\d{1,2}\\s+[A-Za-z]+\\s+\\d{4})', 'i'),
+    // Label + MMM DD, YYYY
+    new RegExp(DATE_LABEL.source + '([A-Za-z]+\\s+\\d{1,2},?\\s+\\d{4})', 'i'),
+  ];
+
+  for (const pattern of labeledPatterns) {
+    const match = text.match(pattern);
+    if (match && match[1]) {
+      const parsed = parseRawDate(match[1]);
+      if (parsed) return parsed;
+    }
+  }
+
+  // Unlabeled patterns — scan the whole text
+  const unlabeledPatterns: RegExp[] = [
+    // YYYY-MM-DD (ISO)
+    /\b(\d{4}[\-\/\.]\d{1,2}[\-\/\.]\d{1,2})\b/,
+    // DD MMM YYYY (e.g., 12 Jan 2024)
+    /\b(\d{1,2}\s+(?:jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]*\s+\d{4})\b/i,
+    // MMM DD, YYYY (e.g., Jan 12, 2024)
+    /\b((?:jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]*\s+\d{1,2},?\s+\d{4})\b/i,
+    // DD/MM/YYYY or DD-MM-YYYY
+    /\b(\d{1,2}[\/\-\.]\d{1,2}[\/\-\.]\d{4})\b/,
+  ];
+
+  for (const pattern of unlabeledPatterns) {
+    const match = text.match(pattern);
+    if (match && match[1]) {
+      const parsed = parseRawDate(match[1]);
+      if (parsed) return parsed;
+    }
+  }
+
+  return null;
+}
+
+function extractPatientName(text: string): string | null {
+  const patterns = [
+    /patient\s*name\s*[:\-]\s*([A-Za-z][A-Za-z\s\.\-]{1,50})/i,
+    /patient\s*[:\-]\s*([A-Za-z][A-Za-z\s\.\-]{1,50})/i,
+    /name\s*[:\-]\s*([A-Za-z][A-Za-z\s\.\-]{1,50})/i,
+    /mr\.?\s+([A-Za-z][A-Za-z\s\.\-]{1,50})/i,
+    /mrs\.?\s+([A-Za-z][A-Za-z\s\.\-]{1,50})/i,
+    /ms\.?\s+([A-Za-z][A-Za-z\s\.\-]{1,50})/i,
+  ];
+  for (const pattern of patterns) {
+    const match = text.match(pattern);
+    if (match && match[1]) {
+      const name = match[1].trim().replace(/\s+/g, ' ');
+      // Filter out common false positives
+      const lower = name.toLowerCase();
+      if (
+        lower.includes('report') ||
+        lower.includes('date') ||
+        lower.includes('test') ||
+        lower.includes('result') ||
+        lower.includes('lab') ||
+        name.length < 2
+      ) {
+        continue;
       }
+      return name;
     }
   }
   return null;
 }
 
-// ─── Medical test patterns ────────────────────────────────────────────────────
+// ── CBC ───────────────────────────────────────────────────────────────────────
 
-interface TestPattern {
-  names: string[];
-  key: string;
-  category: string;
-}
+function extractCBC(text: string): Record<string, string> | null {
+  const fields: Record<string, string> = {};
 
-const TEST_PATTERNS: TestPattern[] = [
-  // CBC
-  { names: ['WBC', 'White Blood Cell', 'White Blood Count', 'Leukocytes'], key: 'wbc', category: 'CBC' },
-  { names: ['RBC', 'Red Blood Cell', 'Red Blood Count', 'Erythrocytes'], key: 'rbc', category: 'CBC' },
-  { names: ['Hemoglobin', 'Hgb', 'Hb'], key: 'hemoglobin', category: 'CBC' },
-  { names: ['Hematocrit', 'Hct', 'PCV'], key: 'hematocrit', category: 'CBC' },
-  { names: ['Platelets', 'PLT', 'Thrombocytes', 'Platelet Count'], key: 'platelets', category: 'CBC' },
-  // LFT
-  { names: ['ALT', 'SGPT', 'Alanine Aminotransferase', 'Alanine Transaminase'], key: 'alt', category: 'LFT' },
-  { names: ['AST', 'SGOT', 'Aspartate Aminotransferase', 'Aspartate Transaminase'], key: 'ast', category: 'LFT' },
-  { names: ['ALP', 'Alkaline Phosphatase'], key: 'alp', category: 'LFT' },
-  { names: ['Bilirubin', 'Total Bilirubin', 'T. Bilirubin', 'T.Bilirubin'], key: 'bilirubin', category: 'LFT' },
-  { names: ['Albumin', 'Serum Albumin'], key: 'albumin', category: 'LFT' },
-  // Cholesterol
-  { names: ['Total Cholesterol', 'Cholesterol Total', 'Cholesterol'], key: 'total', category: 'Cholesterol' },
-  { names: ['HDL', 'HDL Cholesterol', 'HDL-C', 'High Density Lipoprotein'], key: 'hdl', category: 'Cholesterol' },
-  { names: ['LDL', 'LDL Cholesterol', 'LDL-C', 'Low Density Lipoprotein'], key: 'ldl', category: 'Cholesterol' },
-  { names: ['Triglycerides', 'TG', 'Triglyceride', 'TRIG'], key: 'triglycerides', category: 'Cholesterol' },
-  // Blood Sugar
-  { names: ['Fasting Glucose', 'Fasting Blood Sugar', 'FBS', 'FBG', 'Fasting Blood Glucose'], key: 'fasting', category: 'BloodSugar' },
-  { names: ['Post Meal', 'Post-meal', 'Postprandial', 'PP Glucose', 'PPBS', '2hr PP', '2-hour PP'], key: 'postMeal', category: 'BloodSugar' },
-  { names: ['HbA1c', 'Hba1c', 'A1C', 'Glycated Hemoglobin', 'Glycosylated Hemoglobin'], key: 'hba1c', category: 'BloodSugar' },
-  // Blood Pressure
-  { names: ['Systolic', 'SBP', 'Systolic BP', 'Systolic Blood Pressure'], key: 'systolic', category: 'BloodPressure' },
-  { names: ['Diastolic', 'DBP', 'Diastolic BP', 'Diastolic Blood Pressure'], key: 'diastolic', category: 'BloodPressure' },
-  { names: ['Pulse', 'Heart Rate', 'HR', 'Pulse Rate'], key: 'pulse', category: 'BloodPressure' },
-];
+  const patterns: Record<string, RegExp[]> = {
+    hemoglobin: [/h(?:a?e)?moglobin[^0-9]*([0-9]+\.?[0-9]*)/i, /hb[^0-9]*([0-9]+\.?[0-9]*)/i],
+    wbc: [/w(?:hite)?\s*b(?:lood)?\s*c(?:ell|ount)?[^0-9]*([0-9]+\.?[0-9]*)/i, /wbc[^0-9]*([0-9]+\.?[0-9]*)/i, /leukocytes?[^0-9]*([0-9]+\.?[0-9]*)/i],
+    rbc: [/r(?:ed)?\s*b(?:lood)?\s*c(?:ell|ount)?[^0-9]*([0-9]+\.?[0-9]*)/i, /rbc[^0-9]*([0-9]+\.?[0-9]*)/i],
+    platelets: [/platelet[^0-9]*([0-9]+\.?[0-9]*)/i, /plt[^0-9]*([0-9]+\.?[0-9]*)/i, /thrombocytes?[^0-9]*([0-9]+\.?[0-9]*)/i],
+    hematocrit: [/h(?:a?e)?matocrit[^0-9]*([0-9]+\.?[0-9]*)/i, /hct[^0-9]*([0-9]+\.?[0-9]*)/i, /pcv[^0-9]*([0-9]+\.?[0-9]*)/i],
+    mcv: [/mcv[^0-9]*([0-9]+\.?[0-9]*)/i, /mean\s*corp(?:uscular)?\s*vol[^0-9]*([0-9]+\.?[0-9]*)/i],
+    mch: [/\bmch\b[^0-9]*([0-9]+\.?[0-9]*)/i],
+    mchc: [/mchc[^0-9]*([0-9]+\.?[0-9]*)/i],
+    neutrophils: [/neutrophil[^0-9]*([0-9]+\.?[0-9]*)/i],
+    lymphocytes: [/lymphocyte[^0-9]*([0-9]+\.?[0-9]*)/i],
+    monocytes: [/monocyte[^0-9]*([0-9]+\.?[0-9]*)/i],
+    eosinophils: [/eosinophil[^0-9]*([0-9]+\.?[0-9]*)/i],
+    basophils: [/basophil[^0-9]*([0-9]+\.?[0-9]*)/i],
+  };
 
-// Matches a test name followed by a numeric value (with optional units)
-function buildTestRegex(name: string): RegExp {
-  const escaped = name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-  // e.g. "WBC : 5.2 K/µL" or "WBC 5.2" or "WBC=5.2"
-  return new RegExp(
-    `${escaped}\\s*[:\\-=]?\\s*(\\d+\\.?\\d*)`,
-    'i'
-  );
-}
-
-function extractTestValues(text: string): { pairs: ExtractedTestPair[]; categoryCounts: Record<string, number> } {
-  const pairs: ExtractedTestPair[] = [];
-  const categoryCounts: Record<string, number> = {};
-  const foundKeys = new Set<string>();
-
-  for (const testPattern of TEST_PATTERNS) {
-    if (foundKeys.has(testPattern.key)) continue;
-
-    for (const name of testPattern.names) {
-      const regex = buildTestRegex(name);
-      const match = regex.exec(text);
+  let found = 0;
+  for (const [key, regexes] of Object.entries(patterns)) {
+    for (const regex of regexes) {
+      const match = text.match(regex);
       if (match) {
-        const value = match[1];
-        pairs.push({ testName: testPattern.key, value });
-        foundKeys.add(testPattern.key);
-        categoryCounts[testPattern.category] = (categoryCounts[testPattern.category] || 0) + 1;
+        fields[key] = match[1];
+        found++;
         break;
       }
     }
   }
 
-  // Also try to detect blood pressure in "120/80" format
-  if (!foundKeys.has('systolic') && !foundKeys.has('diastolic')) {
-    const bpMatch = /\b(\d{2,3})\s*\/\s*(\d{2,3})\b/.exec(text);
-    if (bpMatch) {
-      pairs.push({ testName: 'systolic', value: bpMatch[1] });
-      pairs.push({ testName: 'diastolic', value: bpMatch[2] });
-      categoryCounts['BloodPressure'] = (categoryCounts['BloodPressure'] || 0) + 2;
-    }
-  }
-
-  return { pairs, categoryCounts };
+  return found >= 2 ? fields : null;
 }
 
-function suggestCategory(categoryCounts: Record<string, number>): string | null {
-  let best: string | null = null;
-  let bestCount = 0;
-  for (const [cat, count] of Object.entries(categoryCounts)) {
-    if (count > bestCount) {
-      bestCount = count;
-      best = cat;
-    }
-  }
-  return best;
-}
+// ── LFT ───────────────────────────────────────────────────────────────────────
 
-// ─── PDF text extraction (text-based PDFs only) ───────────────────────────────
+function extractLFT(text: string): Record<string, string> | null {
+  const fields: Record<string, string> = {};
 
-async function extractTextFromPDF(bytes: Uint8Array): Promise<string> {
-  // Simple heuristic: scan for readable ASCII text in the PDF byte stream
-  // This works for text-based PDFs (not scanned images)
-  const decoder = new TextDecoder('latin1');
-  const raw = decoder.decode(bytes);
-
-  // Extract text between BT (begin text) and ET (end text) markers
-  const textChunks: string[] = [];
-
-  // Match parenthesized strings (PDF text objects)
-  const parenRegex = /\(([^)\\]*(?:\\.[^)\\]*)*)\)/g;
-  let m: RegExpExecArray | null;
-  while ((m = parenRegex.exec(raw)) !== null) {
-    const chunk = m[1]
-      .replace(/\\n/g, '\n')
-      .replace(/\\r/g, '\r')
-      .replace(/\\t/g, '\t')
-      .replace(/\\\\/g, '\\')
-      .replace(/\\\(/g, '(')
-      .replace(/\\\)/g, ')')
-      // Remove non-printable chars
-      .replace(/[^\x20-\x7E\n\r\t]/g, ' ');
-    if (chunk.trim().length > 1) {
-      textChunks.push(chunk);
-    }
-  }
-
-  // Also try to extract hex strings <...>
-  const hexRegex = /<([0-9A-Fa-f\s]+)>/g;
-  while ((m = hexRegex.exec(raw)) !== null) {
-    const hex = m[1].replace(/\s/g, '');
-    if (hex.length % 2 === 0 && hex.length > 2) {
-      let decoded = '';
-      for (let i = 0; i < hex.length; i += 2) {
-        const code = parseInt(hex.slice(i, i + 2), 16);
-        if (code >= 32 && code <= 126) decoded += String.fromCharCode(code);
-        else if (code === 10 || code === 13) decoded += '\n';
-        else decoded += ' ';
-      }
-      if (decoded.trim().length > 1) textChunks.push(decoded);
-    }
-  }
-
-  return textChunks.join(' ');
-}
-
-// ─── Image text extraction (canvas-based, very basic) ────────────────────────
-
-async function extractTextFromImage(bytes: Uint8Array, mimeType: string): Promise<string> {
-  // We can't do real OCR in the browser without a library.
-  // Return a placeholder that signals the user to verify manually.
-  // The raw bytes are uploaded; we do our best with pattern matching on any
-  // embedded metadata or EXIF text.
-  const decoder = new TextDecoder('latin1');
-  const raw = decoder.decode(bytes);
-
-  // Try to find any ASCII text segments in the image binary
-  const asciiRegex = /[ -~]{4,}/g;
-  const chunks: string[] = [];
-  let m: RegExpExecArray | null;
-  while ((m = asciiRegex.exec(raw)) !== null) {
-    const chunk = m[0].trim();
-    if (chunk.length >= 4) chunks.push(chunk);
-  }
-
-  return chunks.join(' ');
-}
-
-// ─── Main extraction entry point ─────────────────────────────────────────────
-
-export async function extractRecordData(
-  bytes: Uint8Array,
-  mimeType: string
-): Promise<ExtractedRecordData> {
-  let rawText = '';
-
-  if (mimeType === 'application/pdf') {
-    rawText = await extractTextFromPDF(bytes);
-  } else {
-    rawText = await extractTextFromImage(bytes, mimeType);
-  }
-
-  const detectedDate = extractDate(rawText);
-  const { pairs, categoryCounts } = extractTestValues(rawText);
-  const suggestedCategory = suggestCategory(categoryCounts);
-
-  return {
-    detectedDate,
-    testNameValuePairs: pairs,
-    rawExtractedText: rawText.slice(0, 4000), // cap for display
-    suggestedCategory,
+  const patterns: Record<string, RegExp[]> = {
+    alt: [/\balt\b[^0-9]*([0-9]+\.?[0-9]*)/i, /alanine\s*(?:amino)?transf[^0-9]*([0-9]+\.?[0-9]*)/i, /sgpt[^0-9]*([0-9]+\.?[0-9]*)/i],
+    ast: [/\bast\b[^0-9]*([0-9]+\.?[0-9]*)/i, /aspartate\s*(?:amino)?transf[^0-9]*([0-9]+\.?[0-9]*)/i, /sgot[^0-9]*([0-9]+\.?[0-9]*)/i],
+    alp: [/\balp\b[^0-9]*([0-9]+\.?[0-9]*)/i, /alkaline\s*phosphatase[^0-9]*([0-9]+\.?[0-9]*)/i],
+    bilirubin: [/(?:total\s*)?bilirubin[^0-9]*([0-9]+\.?[0-9]*)/i],
+    albumin: [/albumin[^0-9]*([0-9]+\.?[0-9]*)/i],
+    totalProtein: [/total\s*protein[^0-9]*([0-9]+\.?[0-9]*)/i],
+    ggt: [/\bggt\b[^0-9]*([0-9]+\.?[0-9]*)/i, /gamma\s*(?:glutamyl)?[^0-9]*([0-9]+\.?[0-9]*)/i],
   };
+
+  let found = 0;
+  for (const [key, regexes] of Object.entries(patterns)) {
+    for (const regex of regexes) {
+      const match = text.match(regex);
+      if (match) {
+        fields[key] = match[1];
+        found++;
+        break;
+      }
+    }
+  }
+
+  return found >= 2 ? fields : null;
+}
+
+// ── Cholesterol ───────────────────────────────────────────────────────────────
+
+function extractCholesterol(text: string): Record<string, string> | null {
+  const fields: Record<string, string> = {};
+
+  const patterns: Record<string, RegExp[]> = {
+    totalCholesterol: [/total\s*cholesterol[^0-9]*([0-9]+\.?[0-9]*)/i, /cholesterol[^0-9]*([0-9]+\.?[0-9]*)/i],
+    ldl: [/\bldl\b[^0-9]*([0-9]+\.?[0-9]*)/i, /low\s*density[^0-9]*([0-9]+\.?[0-9]*)/i],
+    hdl: [/\bhdl\b[^0-9]*([0-9]+\.?[0-9]*)/i, /high\s*density[^0-9]*([0-9]+\.?[0-9]*)/i],
+    triglycerides: [/triglyceride[^0-9]*([0-9]+\.?[0-9]*)/i, /tg[^0-9]*([0-9]+\.?[0-9]*)/i],
+    vldl: [/\bvldl\b[^0-9]*([0-9]+\.?[0-9]*)/i],
+  };
+
+  let found = 0;
+  for (const [key, regexes] of Object.entries(patterns)) {
+    for (const regex of regexes) {
+      const match = text.match(regex);
+      if (match) {
+        fields[key] = match[1];
+        found++;
+        break;
+      }
+    }
+  }
+
+  return found >= 2 ? fields : null;
+}
+
+// ── Blood Sugar ───────────────────────────────────────────────────────────────
+
+function extractBloodSugar(text: string): Record<string, string> | null {
+  const fields: Record<string, string> = {};
+
+  const patterns: Record<string, RegExp[]> = {
+    fastingGlucose: [/fasting\s*(?:blood\s*)?(?:glucose|sugar)[^0-9]*([0-9]+\.?[0-9]*)/i, /fbg[^0-9]*([0-9]+\.?[0-9]*)/i, /fbs[^0-9]*([0-9]+\.?[0-9]*)/i],
+    postprandialGlucose: [/post\s*(?:prandial|meal)[^0-9]*([0-9]+\.?[0-9]*)/i, /pp\s*(?:blood\s*)?(?:glucose|sugar)[^0-9]*([0-9]+\.?[0-9]*)/i, /ppbs[^0-9]*([0-9]+\.?[0-9]*)/i],
+    hba1c: [/hba1c[^0-9]*([0-9]+\.?[0-9]*)/i, /glycated\s*h(?:a?e)?moglobin[^0-9]*([0-9]+\.?[0-9]*)/i, /a1c[^0-9]*([0-9]+\.?[0-9]*)/i],
+    randomGlucose: [/random\s*(?:blood\s*)?(?:glucose|sugar)[^0-9]*([0-9]+\.?[0-9]*)/i, /rbs[^0-9]*([0-9]+\.?[0-9]*)/i],
+  };
+
+  let found = 0;
+  for (const [key, regexes] of Object.entries(patterns)) {
+    for (const regex of regexes) {
+      const match = text.match(regex);
+      if (match) {
+        fields[key] = match[1];
+        found++;
+        break;
+      }
+    }
+  }
+
+  // Also check for generic glucose
+  if (found === 0) {
+    const glucoseMatch = text.match(/glucose[^0-9]*([0-9]+\.?[0-9]*)/i);
+    if (glucoseMatch) {
+      fields['fastingGlucose'] = glucoseMatch[1];
+      found++;
+    }
+  }
+
+  return found >= 1 ? fields : null;
+}
+
+// ── Blood Pressure ────────────────────────────────────────────────────────────
+
+function extractBloodPressure(text: string): Record<string, string> | null {
+  const fields: Record<string, string> = {};
+
+  // Pattern: 120/80 or systolic/diastolic
+  const bpPattern = text.match(/(?:bp|blood\s*pressure)[^0-9]*([0-9]+)\s*[\/\-]\s*([0-9]+)/i);
+  if (bpPattern) {
+    fields['systolic'] = bpPattern[1];
+    fields['diastolic'] = bpPattern[2];
+  }
+
+  const systolicMatch = text.match(/systolic[^0-9]*([0-9]+)/i);
+  if (systolicMatch) fields['systolic'] = systolicMatch[1];
+
+  const diastolicMatch = text.match(/diastolic[^0-9]*([0-9]+)/i);
+  if (diastolicMatch) fields['diastolic'] = diastolicMatch[1];
+
+  const pulseMatch = text.match(/(?:pulse|heart\s*rate)[^0-9]*([0-9]+)/i);
+  if (pulseMatch) fields['pulse'] = pulseMatch[1];
+
+  return Object.keys(fields).length >= 1 ? fields : null;
+}
+
+// ── Main extraction ───────────────────────────────────────────────────────────
+
+export function extractFromText(text: string): ExtractedTestData {
+  const patientName = extractPatientName(text);
+  const date = extractDate(text);
+  const records: ExtractedRecordEntry[] = [];
+
+  const cbcFields = extractCBC(text);
+  if (cbcFields && Object.keys(cbcFields).length > 0) {
+    records.push({ category: 'CBC', metricFields: cbcFields, date });
+  }
+
+  const lftFields = extractLFT(text);
+  if (lftFields && Object.keys(lftFields).length > 0) {
+    records.push({ category: 'LFT', metricFields: lftFields, date });
+  }
+
+  const cholFields = extractCholesterol(text);
+  if (cholFields && Object.keys(cholFields).length > 0) {
+    records.push({ category: 'Cholesterol', metricFields: cholFields, date });
+  }
+
+  const bsFields = extractBloodSugar(text);
+  if (bsFields && Object.keys(bsFields).length > 0) {
+    records.push({ category: 'BloodSugar', metricFields: bsFields, date });
+  }
+
+  const bpFields = extractBloodPressure(text);
+  if (bpFields && Object.keys(bpFields).length > 0) {
+    records.push({ category: 'BloodPressure', metricFields: bpFields, date });
+  }
+
+  // If nothing detected, create a GeneralAilments entry
+  if (records.length === 0) {
+    records.push({
+      category: 'GeneralAilments',
+      metricFields: { notes: text.slice(0, 500) },
+      date,
+    });
+  }
+
+  return { patientName, records, rawExtractedText: text };
+}
+
+export async function extractFromFile(bytes: Uint8Array): Promise<ExtractedTestData> {
+  const text = extractText(bytes);
+  return extractFromText(text);
 }

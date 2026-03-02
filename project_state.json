@@ -1,16 +1,19 @@
 {
   "schemaVersion": "1.0.0",
-  "projectStateVersion": 7,
-  "summary": "Web-based medical records tracker that stores CBC, LFT, Cholesterol, Sugar, BP, and general ailment records tagged with dates. Builds a historical timeline and uses AI to analyze health metric progression over time. Supports user login with separate user consoles and a persistent left-side dashboard panel shown when data is available.",
+  "projectStateVersion": 11,
+  "summary": "Web-based medical records tracker that stores CBC, LFT, Cholesterol, Sugar, BP, and general ailment records tagged with dates. Builds a historical timeline and uses AI to analyze health metric progression over time. Supports user login with separate user consoles and a persistent left-side dashboard panel shown when data is available. Supports family member profiles (up to 8 per user); uploaded reports auto-identify patient name and date, and all extracted tests are added under the correct family member profile.",
   "architectural_notes": [
     "Web app built with React + Motoko (not Android)",
     "Medical records stored with date metadata for historical tracking",
     "User authentication required; each user has an isolated console/data view",
     "Left-side dashboard panel is conditionally shown based on user data availability",
-    "OCR feature required for PDF/image uploads to extract dates, test names, and test results"
+    "OCR feature required for PDF/image uploads to extract dates, test names, and test results",
+    "Each user can have up to 8 family member profiles; all medical records are scoped to a family member, not just the principal"
   ],
-  "known_issues": [],
-  "isFixRequest": false,
+  "known_issues": [
+    "OCR extraction fails to detect/parse the date from uploaded medical report documents"
+  ],
+  "isFixRequest": true,
   "existing_features": [
     {
       "id": "feature-build-a-medical-record-entry-form-ui-that-allows-users-to-select-a-record-category-cbc-lft-cholesterol-blood-sugar-blood-pressure-general-ailment-fill-in-the-relevant-metric-fields-and-submit-with-a-date-the-form-must-dynamically-display-the-correct-input-fields-based-on-the-selected-category",
@@ -83,6 +86,46 @@
         "REQ-12"
       ],
       "version": 1
+    },
+    {
+      "id": "feature-extend-the-ocr-extraction-logic-frontend-src-lib-ocrextraction-ts-to-also-detect-the-patient-name-from-uploaded-report-text-add-regex-patterns-that-match-common-report-header-formats-e-g-patient-name-name-patient-and-return-the-extracted-name-alongside-the-existing-date-and-test-result-fields",
+      "title": "Extend the OCR extraction logic (frontend/src/lib/ocrExtraction.ts) to also detect the patient name from uploaded report text. Add regex patterns that match common report header formats (e.g., 'Patient Name:', 'Name:', 'Patient:') and return the extracted name alongside the existing date and test result fields.",
+      "reqIds": [
+        "REQ-15"
+      ],
+      "version": 1
+    },
+    {
+      "id": "feature-extend-the-ocr-extraction-logic-to-extract-all-detected-test-categories-and-their-metric-values-from-a-single-uploaded-report-not-just-the-first-matched-category-the-extraction-result-must-return-an-array-of-record-objects-each-containing-a-category-its-metric-fields-and-the-shared-report-date-so-that-a-multi-panel-report-e-g-one-file-containing-both-cbc-and-lft-results-produces-multiple-records",
+      "title": "Extend the OCR extraction logic to extract ALL detected test categories and their metric values from a single uploaded report, not just the first matched category. The extraction result must return an array of record objects, each containing a category, its metric fields, and the shared report date, so that a multi-panel report (e.g., one file containing both CBC and LFT results) produces multiple records.",
+      "reqIds": [
+        "REQ-16"
+      ],
+      "version": 1
+    },
+    {
+      "id": "feature-update-the-uploadrecordform-component-frontend-src-components-uploadrecordform-tsx-to-1-after-ocr-extraction-display-the-detected-patient-name-and-allow-the-user-to-confirm-or-change-it-via-a-dropdown-select-of-existing-family-member-profiles-plus-an-option-to-create-a-new-profile-2-display-all-extracted-test-categories-as-separate-pending-records-one-card-or-row-per-category-3-allow-the-user-to-review-and-edit-each-record-s-fields-before-submission-4-on-submit-add-every-extracted-record-under-the-selected-confirmed-family-member-profile-by-calling-the-familymemberid-scoped-addrecord-endpoint-for-each-record",
+      "title": "Update the UploadRecordForm component (frontend/src/components/UploadRecordForm.tsx) to: (1) after OCR extraction display the detected patient name and allow the user to confirm or change it via a dropdown/select of existing family member profiles plus an option to create a new profile; (2) display all extracted test categories as separate pending records (one card or row per category); (3) allow the user to review and edit each record's fields before submission; (4) on submit, add every extracted record under the selected/confirmed family member profile by calling the familyMemberId-scoped addRecord endpoint for each record.",
+      "reqIds": [
+        "REQ-17"
+      ],
+      "version": 1
+    },
+    {
+      "id": "feature-add-a-family-members-management-ui-accessible-from-the-main-navigation-or-settings-it-must-allow-the-authenticated-user-to-view-all-existing-family-member-profiles-name-record-count-add-a-new-family-member-name-input-and-delete-a-family-member-profile-with-a-confirmation-dialog-enforce-the-8-member-limit-with-an-inline-error-message-when-the-limit-is-reached-the-manual-add-record-form-must-also-include-a-family-member-selector-so-records-can-be-manually-entered-for-any-family-member",
+      "title": "Add a Family Members management UI accessible from the main navigation or settings. It must allow the authenticated user to view all existing family member profiles (name, record count), add a new family member (name input), and delete a family member profile with a confirmation dialog. Enforce the 8-member limit with an inline error message when the limit is reached. The manual Add Record form must also include a family member selector so records can be manually entered for any family member.",
+      "reqIds": [
+        "REQ-18"
+      ],
+      "version": 1
+    },
+    {
+      "id": "feature-fix-the-date-extraction-logic-in-frontend-src-lib-ocrextraction-ts-so-that-the-report-date-is-reliably-detected-from-uploaded-medical-report-documents-expand-the-regex-patterns-to-cover-common-date-formats-found-in-medical-reports-including-but-not-limited-to-dd-mm-yyyy-mm-dd-yyyy-yyyy-mm-dd-dd-mm-yyyy-dd-mmm-yyyy-e-g-12-jan-2024-mmm-dd-yyyy-e-g-jan-12-2024-and-label-prefixed-formats-such-as-date-report-date-collection-date-sample-date-test-date-and-date-of-report-the-extracted-date-must-be-returned-as-a-valid-iso-date-string-yyyy-mm-dd-in-the-extractedtestdata-result-and-pre-populated-in-the-date-field-of-each-extracted-record-displayed-in-the-uploadrecordform-component",
+      "title": "Fix the date extraction logic in `frontend/src/lib/ocrExtraction.ts` so that the report date is reliably detected from uploaded medical report documents. Expand the regex patterns to cover common date formats found in medical reports, including but not limited to: 'DD/MM/YYYY', 'MM/DD/YYYY', 'YYYY-MM-DD', 'DD-MM-YYYY', 'DD MMM YYYY' (e.g., '12 Jan 2024'), 'MMM DD, YYYY' (e.g., 'Jan 12, 2024'), and label-prefixed formats such as 'Date:', 'Report Date:', 'Collection Date:', 'Sample Date:', 'Test Date:', and 'Date of Report:'. The extracted date must be returned as a valid ISO date string (YYYY-MM-DD) in the `ExtractedTestData` result and pre-populated in the date field of each extracted record displayed in the `UploadRecordForm` component.",
+      "reqIds": [
+        "REQ-19"
+      ],
+      "version": 1
     }
   ],
   "new_feature_requests": [
@@ -151,6 +194,26 @@
       "summary": "Add a `listUploadedFiles` backend endpoint that returns metadata (file ID, upload timestamp, MIME type) for all files uploaded by the calling principal, and a `deleteUploadedFile` endpoint to remove a file by ID.",
       "reqIds": [
         "REQ-13"
+      ],
+      "status": "pending"
+    },
+    {
+      "id": "AR-12",
+      "summary": "Support up to 8 family member profiles per user account. Each profile has a name and stores medical records independently. Records are scoped to a specific family member.",
+      "reqIds": [],
+      "status": "pending"
+    },
+    {
+      "id": "AR-13",
+      "summary": "When a report is uploaded, OCR must identify the patient name and record date, automatically map the record to the matching family member profile, and add all detected tests/metrics to that profile.",
+      "reqIds": [],
+      "status": "pending"
+    },
+    {
+      "id": "AR-14",
+      "summary": "Extend the backend data model to support up to 8 family member profiles per authenticated user. Each family member profile must have a unique ID, a name, and an independent collection of medical records scoped to that profile. Add backend endpoints: createFamilyMember (name) → profile ID, listFamilyMembers → list of {id, name}, deleteFamilyMember (id), and update all existing addRecord, getAllRecords, and deleteRecord endpoints to accept an optional familyMemberId parameter so that records can be stored and retrieved per family member. Records without a familyMemberId continue to be scoped to the caller's own profile.",
+      "reqIds": [
+        "REQ-14"
       ],
       "status": "pending"
     }

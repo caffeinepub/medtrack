@@ -1,5 +1,5 @@
 import { Link, useLocation } from '@tanstack/react-router';
-import { Clock, BarChart2, Activity, TrendingUp, Calendar } from 'lucide-react';
+import { Clock, BarChart2, Activity, TrendingUp, Calendar, Users } from 'lucide-react';
 import { useGetAllRecords } from '../hooks/useQueries';
 import { getCategorySummaries } from '../utils/recordSummary';
 import { RECORD_TYPE_LABELS, RECORD_TYPE_COLORS } from '../types/medicalRecords';
@@ -7,6 +7,7 @@ import { RecordType } from '../backend';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
+import type { ParsedMedicalRecord as LocalParsedMedicalRecord } from '../types/medicalRecords';
 
 const CATEGORY_ICONS: Record<RecordType, string> = {
   [RecordType.CBC]: '🩸',
@@ -19,16 +20,26 @@ const CATEGORY_ICONS: Record<RecordType, string> = {
 
 const quickLinks = [
   { to: '/timeline', label: 'Timeline', icon: Clock },
+  { to: '/family-members', label: 'Family Members', icon: Users },
   { to: '/analysis', label: 'Analysis', icon: BarChart2 },
   { to: '/add', label: 'Add Record', icon: Activity },
 ];
 
 export function DashboardSidebar() {
-  const { data: records, isLoading } = useGetAllRecords();
+  const { data: records, isLoading } = useGetAllRecords(null);
   const location = useLocation();
 
   const totalRecords = records?.length ?? 0;
-  const summaries = records ? getCategorySummaries(records) : [];
+
+  // Convert to the shape that getCategorySummaries expects (bigint recordDate)
+  const compatRecords: LocalParsedMedicalRecord[] = (records ?? []).map((r) => ({
+    recordId: r.recordId,
+    recordDate: r.recordDate,
+    recordType: r.recordType,
+    data: r.data as unknown as LocalParsedMedicalRecord['data'],
+  }));
+
+  const summaries = getCategorySummaries(compatRecords);
 
   return (
     <aside className="w-64 shrink-0 hidden lg:flex flex-col gap-4 sticky top-24 self-start">

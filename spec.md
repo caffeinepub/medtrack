@@ -1,18 +1,13 @@
 # Specification
 
 ## Summary
-**Goal:** Add the ability to upload PDF or image medical records with OCR-based data extraction that pre-populates the Add Record form in MediTrack.
+**Goal:** Fix OCR date extraction in MediTrack so that report dates are reliably detected from uploaded medical documents and pre-populated in the upload form.
 
 **Planned changes:**
-- Add a backend `uploadFile` endpoint that accepts PDF/image file bytes, stores them per principal, and returns a file reference ID
-- Add a backend `extractRecordFromFile` endpoint that performs OCR-style text parsing on a stored file to extract date, test names, and result values
-- Add a backend `listUploadedFiles` endpoint returning file metadata (ID, timestamp, MIME type) for the calling principal
-- Add a backend `deleteUploadedFile` endpoint to remove a file by ID for the owning principal
-- Add an "Upload Record" tab/toggle on the Add Record page alongside the existing manual entry form
-- Add a file upload area supporting drag-and-drop and file picker for PNG, JPEG, and PDF (max 5 MB)
-- Show a loading/processing state while OCR extraction runs after file selection
-- Pre-populate the date, category, and metric fields with extracted OCR data for user review and editing
-- Show an expandable read-only "Extracted Text" section displaying raw OCR output
-- Show a clear error/warning if OCR returns no usable data or the file exceeds 5 MB
+- Expand regex patterns in `frontend/src/lib/ocrExtraction.ts` to support common date formats: `DD/MM/YYYY`, `MM/DD/YYYY`, `YYYY-MM-DD`, `DD-MM-YYYY`, `DD MMM YYYY`, and `MMM DD, YYYY`
+- Add support for label-prefixed date detection: `Date:`, `Report Date:`, `Collection Date:`, `Sample Date:`, `Test Date:`, and `Date of Report:`
+- Convert all extracted dates to ISO 8601 format (`YYYY-MM-DD`) in the `ExtractedTestData` result
+- Wire the extracted date into the date field of the `UploadRecordForm` component so it is pre-populated on review
+- If no date is found, leave the date field empty without errors
 
-**User-visible outcome:** Users can upload a PDF or image on the Add Record page, have dates, test names, and results automatically extracted and filled into the form, review and correct the pre-populated data, and then submit the record normally.
+**User-visible outcome:** When a user uploads a medical report PDF or image, the report date is automatically detected and pre-filled in the review form, regardless of the date format used in the document.

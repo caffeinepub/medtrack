@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { RecordType, RECORD_TYPE_LABELS } from '../types/medicalRecords';
-import { useGetAllRecords } from '../hooks/useQueries';
+import { useGetAllRecords, useListFamilyMembers } from '../hooks/useQueries';
 import { ProgressionChart } from './ProgressionChart';
 import { TrendSummary } from './TrendSummary';
 import { buildChartData, analyzeMetricTrend, CATEGORY_METRIC_KEYS } from '../utils/trendAnalysis';
@@ -8,7 +8,8 @@ import type { MetricTrend } from '../utils/trendAnalysis';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
-import { BarChart2, AlertCircle } from 'lucide-react';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { BarChart2, AlertCircle, Users } from 'lucide-react';
 
 const ANALYZABLE_CATEGORIES = [
   RecordType.CBC,
@@ -32,8 +33,14 @@ function InsufficientDataState({ category }: { category: RecordType }) {
   );
 }
 
-function CategoryAnalysis({ category }: { category: RecordType }) {
-  const { data: allRecords, isLoading } = useGetAllRecords();
+function CategoryAnalysis({
+  category,
+  familyMemberIdParam,
+}: {
+  category: RecordType;
+  familyMemberIdParam: string | null;
+}) {
+  const { data: allRecords, isLoading } = useGetAllRecords(familyMemberIdParam);
 
   if (isLoading) {
     return (
@@ -56,9 +63,10 @@ function CategoryAnalysis({ category }: { category: RecordType }) {
     return <InsufficientDataState category={category} />;
   }
 
+  // Build chart-compatible records: { date: number; data: Record<string, string> }
   const recordsForChart = categoryRecords.map((r) => ({
     date: Number(r.recordDate),
-    data: r.data as unknown as Record<string, string>,
+    data: r.data as Record<string, string>,
   }));
 
   const chartData = buildChartData(recordsForChart, metricDefs.map((m) => m.key));
@@ -87,7 +95,9 @@ function CategoryAnalysis({ category }: { category: RecordType }) {
           <CardTitle className="text-base font-semibold">
             {RECORD_TYPE_LABELS[category]} Progression
           </CardTitle>
-          <p className="text-xs text-muted-foreground">{categoryRecords.length} records · {chartData.length} data points</p>
+          <p className="text-xs text-muted-foreground">
+            {categoryRecords.length} records · {chartData.length} data points
+          </p>
         </CardHeader>
         <CardContent>
           <ProgressionChart data={chartData} metrics={chartMetrics} />
@@ -109,17 +119,47 @@ function CategoryAnalysis({ category }: { category: RecordType }) {
 }
 
 export function AnalysisDashboard() {
-  const { data: allRecords } = useGetAllRecords();
+  const { data: allRecords } = useGetAllRecords(null);
   const [activeCategory, setActiveCategory] = useState<RecordType>(RecordType.CBC);
+  const [selectedMemberId, setSelectedMemberId] = useState<string>('__personal__');
 
-  // Count records per category
+  const { data: familyMembers = [] } = useListFamilyMembers();
+  const familyMemberIdParam = selectedMemberId === '__personal__' ? null : selectedMemberId;
+
+  const { data: memberRecords } = useGetAllRecords(familyMemberIdParam);
+
+  const memberName =
+    selectedMemberId === '__personal__'
+      ? 'My Records'
+      : familyMembers.find((m) => m.profileId === selectedMemberId)?.name ?? 'Family Member';
+
+  // Count records per category for the selected member
   const categoryCounts = ANALYZABLE_CATEGORIES.reduce<Record<string, number>>((acc, cat) => {
-    acc[cat] = (allRecords ?? []).filter((r) => r.recordType === cat).length;
+    acc[cat] = (memberRecords ?? []).filter((r) => r.recordType === cat).length;
     return acc;
   }, {});
 
   return (
     <div>
+      {/* Family member filter */}
+      <div className="flex items-center gap-3 mb-5">
+        <Users className="w-4 h-4 text-muted-foreground shrink-0" />
+        <Select value={selectedMemberId} onValueChange={setSelectedMemberId}>
+          <SelectTrigger className="w-52">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="__personal__">My Records</SelectItem>
+            {familyMembers.map((m) => (
+              <SelectItem key={m.profileId} value={m.profileId}>
+                {m.name}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+        <span className="text-sm text-muted-foreground hidden sm:inline">— {memberName}</span>
+      </div>
+
       <Tabs value={activeCategory} onValueChange={(v) => setActiveCategory(v as RecordType)}>
         <div className="overflow-x-auto pb-1 -mx-1 px-1">
           <TabsList className="flex w-max gap-1 bg-muted/50 p-1 rounded-xl mb-6">
@@ -140,7 +180,7 @@ export function AnalysisDashboard() {
 
         {ANALYZABLE_CATEGORIES.map((cat) => (
           <TabsContent key={cat} value={cat} className="mt-0">
-            <CategoryAnalysis category={cat} />
+            <CategoryAnalysis category={cat} familyMemberIdParam={familyMemberIdParam} />
           </TabsContent>
         ))}
       </Tabs>
